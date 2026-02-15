@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PeterTheCourseAdvisor - Get Started</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="topnav">
+    <div class="brand">
+      <span class="icon">P</span>
+      PeterTheCourseAdvisor
+    </div>
+    <div class="nav-links">
+      <a href="UserProfilePage.html" class="active">Get Started</a>
+      <a href="SearchPage.html">Search</a>
+    </div>
+  </nav>
+
+  <!-- Onboarding Card -->
+  <div class="onboarding-wrapper">
+    <div class="onboarding-card">
+
+      <div class="onboarding-header">
+        <h1>Welcome, Anteater!</h1>
+        <p>Tell us a bit about yourself so we can find the best courses for you.</p>
+      </div>
+
+      <!-- Step dots -->
+      <div class="step-indicator">
+        <div class="step-dot active" data-step="1"></div>
+        <div class="step-dot" data-step="2"></div>
+        <div class="step-dot" data-step="3"></div>
+        <div class="step-dot" data-step="4"></div>
+      </div>
+
+      <div class="form-body">
+
+        <!-- ========== STEP 1: Basic Info ========== -->
+        <div class="form-step active" data-step="1">
+          <h2>Basic Information</h2>
+          <p class="step-desc">Just the essentials — nothing too private.</p>
+
+          <div class="field">
+            <label for="displayName">Display Name</label>
+            <input type="text" id="displayName" placeholder="e.g. Peter" />
+          </div>
+
+          <div class="field">
+            <label>Class Standing</label>
+            <div class="toggle-group">
+              <div class="toggle-option">
+                <input type="radio" name="standing" id="standFresh" value="Freshman" />
+                <label for="standFresh">Freshman</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="standing" id="standSoph" value="Sophomore" />
+                <label for="standSoph">Sophomore</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="standing" id="standJr" value="Junior" />
+                <label for="standJr">Junior</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="standing" id="standSr" value="Senior" />
+                <label for="standSr">Senior</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="standing" id="standTransfer" value="Transfer" />
+                <label for="standTransfer">Transfer</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="college">School / College</label>
+            <select id="college">
+              <option value="">Select your school...</option>
+              <option value="engineering">Samueli School of Engineering</option>
+              <option value="ics">Donald Bren School of ICS</option>
+              <option value="biosci">School of Biological Sciences</option>
+              <option value="humanities">School of Humanities</option>
+              <option value="arts">Claire Trevor School of the Arts</option>
+              <option value="socsci">School of Social Sciences</option>
+              <option value="physci">School of Physical Sciences</option>
+              <option value="education">School of Education</option>
+              <option value="business">Paul Merage School of Business</option>
+              <option value="nursing">Sue &amp; Bill Gross School of Nursing</option>
+              <option value="pharm">School of Pharmacy &amp; Pharma. Sci.</option>
+              <option value="undeclared">Undeclared / Exploring</option>
+            </select>
+          </div>
+
+          <div class="btn-row">
+            <span></span>
+            <button class="btn btn-primary" onclick="nextStep()">Continue</button>
+          </div>
+        </div>
+
+        <!-- ========== STEP 2: Academic Goals ========== -->
+        <div class="form-step" data-step="2">
+          <h2>Academic Goals</h2>
+          <p class="step-desc">Help us understand your degree path.</p>
+
+          <div class="field">
+            <label for="majorInput">Intended Major(s)</label>
+            <input type="text" id="majorInput" placeholder="e.g. Computer Science, Data Science" />
+          </div>
+
+          <div class="field">
+            <label for="minorInput">Minor(s) <span class="optional">optional</span></label>
+            <input type="text" id="minorInput" placeholder="e.g. Statistics" />
+          </div>
+
+          <div class="field">
+            <label>What is your priority this quarter?</label>
+            <div class="toggle-group">
+              <div class="toggle-option">
+                <input type="radio" name="priority" id="priDegree" value="degree" checked />
+                <label for="priDegree">Degree Req.</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="priority" id="priGE" value="ge" />
+                <label for="priGE">GE Courses</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="priority" id="priExplore" value="explore" />
+                <label for="priExplore">Explore</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="priority" id="priGraduate" value="graduate" />
+                <label for="priGraduate">Graduate Fast</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>GE Categories You Still Need <span class="optional">select all that apply</span></label>
+            <div class="chip-group" id="geChips">
+              <span class="chip" data-value="Ia">I. Lower-Division Writing</span>
+              <span class="chip" data-value="Ib">I. Upper-Division Writing</span>
+              <span class="chip" data-value="II">II. Science and Technology</span>
+              <span class="chip" data-value="III">III. Social and Behavioral Sciences</span>
+              <span class="chip" data-value="IV">IV. Arts and Humanities</span>
+              <span class="chip" data-value="Va">Va. Quantitative Literacy</span>
+              <span class="chip" data-value="Vb">Vb. Formal Reasoning</span>
+              <span class="chip" data-value="VI">VI. Language Other Than English</span>
+              <span class="chip" data-value="VII">VII. Multicultural Studies</span>
+              <span class="chip" data-value="VIII">VIII. International/Global Issues</span>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+            <button class="btn btn-primary" onclick="nextStep()">Continue</button>
+          </div>
+        </div>
+
+        <!-- ========== STEP 3: Schedule & Preferences ========== -->
+        <div class="form-step" data-step="3">
+          <h2>Schedule &amp; Preferences</h2>
+          <p class="step-desc">So we can find courses that actually fit your life.</p>
+
+          <div class="field">
+            <label>Preferred Class Times</label>
+            <div class="toggle-group">
+              <div class="toggle-option">
+                <input type="radio" name="timeSlot" id="timeMorn" value="morning" />
+                <label for="timeMorn">Morning</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="timeSlot" id="timeAfter" value="afternoon" />
+                <label for="timeAfter">Afternoon</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="timeSlot" id="timeEve" value="evening" />
+                <label for="timeEve">Evening</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="timeSlot" id="timeAny" value="any" checked />
+                <label for="timeAny">No Preference</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Workload Tolerance</label>
+            <div class="toggle-group">
+              <div class="toggle-option">
+                <input type="radio" name="workload" id="wlLight" value="light" />
+                <label for="wlLight">Light</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="workload" id="wlModerate" value="moderate" checked />
+                <label for="wlModerate">Moderate</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="workload" id="wlHeavy" value="heavy" />
+                <label for="wlHeavy">Heavy</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Course Format</label>
+            <div class="toggle-group">
+              <div class="toggle-option">
+                <input type="radio" name="format" id="fmtPerson" value="in-person" />
+                <label for="fmtPerson">In-Person</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="format" id="fmtOnline" value="online" />
+                <label for="fmtOnline">Online</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="format" id="fmtAny" value="any" checked />
+                <label for="fmtAny">No Preference</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Are you a commuter?</label>
+            <div class="toggle-group">
+              <div class="toggle-option">
+                <input type="radio" name="commuter" id="comYes" value="yes" />
+                <label for="comYes">Yes</label>
+              </div>
+              <div class="toggle-option">
+                <input type="radio" name="commuter" id="comNo" value="no" checked />
+                <label for="comNo">No</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+            <button class="btn btn-primary" onclick="nextStep()">Continue</button>
+          </div>
+        </div>
+
+        <!-- ========== STEP 4: Completed Courses (Optional) ========== -->
+        <div class="form-step" data-step="4">
+          <h2>Courses Already Taken</h2>
+          <p class="step-desc">This helps us avoid recommending things you have already completed and check prerequisites. You can always update this later.</p>
+
+          <div class="field">
+            <label for="completedCourses">Completed Courses <span class="optional">optional — comma separated</span></label>
+            <textarea id="completedCourses" placeholder="e.g. ICS 31, ICS 32, MATH 2A, MATH 2B, WRITING 39A"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="quarterTarget">Which quarter are you planning for?</label>
+            <select id="quarterTarget">
+              <option value="2026-Spring">Spring 2026</option>
+              <option value="2026-Summer">Summer 2026</option>
+              <option value="2026-Fall">Fall 2026</option>
+              <option value="2027-Winter">Winter 2027</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="maxUnits">Target Units This Quarter</label>
+            <select id="maxUnits">
+              <option value="12">12 units (light)</option>
+              <option value="16" selected>16 units (standard)</option>
+              <option value="20">20 units (heavy)</option>
+            </select>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+            <button class="btn btn-primary" onclick="submitProfile()">Find My Courses</button>
+          </div>
+        </div>
+
+      </div><!-- /form-body -->
+    </div><!-- /onboarding-card -->
+  </div><!-- /onboarding-wrapper -->
+
+  <script src="static/js/UserProfilePage.js"></script>
+</body>
+</html>

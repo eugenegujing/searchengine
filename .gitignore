@@ -1,0 +1,32 @@
+# === IDE / Editor ===
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# === Generated data files ===
+*.json
+!package.json
+*.db
+
+# === OS files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Environment / secrets ===
+.env
+.env.local

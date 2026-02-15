@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PeterTheCourseAdvisor - Search</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+</head>
+<body>
+
+  <!-- Top Navigation -->
+  <nav class="topnav">
+    <div class="brand">
+      <span class="icon">P</span>
+      PeterTheCourseAdvisor
+    </div>
+    <div class="nav-links">
+      <a href="UserProfilePage.html">Profile</a>
+      <a href="SearchPage.html" class="active">Search</a>
+      <div class="profile-badge" id="profileBadge" style="display:none;">
+        <span class="avatar" id="avatarInitial">?</span>
+        <span id="profileName">Student</span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Two-column layout -->
+  <div class="search-layout">
+
+    <!-- ===== Left Sidebar: Filters ===== -->
+    <aside class="sidebar">
+      <h3>Filters</h3>
+
+      <div class="filter-group">
+        <label for="filterQuarter">Quarter</label>
+        <select id="filterQuarter">
+          <option value="2026-Spring">Spring 2026</option>
+          <option value="2026-Summer">Summer 2026</option>
+          <option value="2026-Fall">Fall 2026</option>
+          <option value="2027-Winter">Winter 2027</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterDept">Department</label>
+        <select id="filterDept">
+          <option value="">All Departments</option>
+          <option value="COMPSCI">Computer Science</option>
+          <option value="I&C SCI">Info & Comp Sci</option>
+          <option value="IN4MATX">Informatics</option>
+          <option value="STATS">Statistics</option>
+          <option value="MATH">Mathematics</option>
+          <option value="WRITING">Writing</option>
+          <option value="PHYSICS">Physics</option>
+          <option value="CHEM">Chemistry</option>
+          <option value="BIO SCI">Bio Sci</option>
+          <option value="ECON">Economics</option>
+          <option value="PSYCH">Psychology</option>
+          <option value="SOC SCI">Social Science</option>
+          <option value="HUMAN">Humanities</option>
+          <option value="ART">Art</option>
+          <option value="MUSIC">Music</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterLevel">Course Level</label>
+        <select id="filterLevel">
+          <option value="">All Levels</option>
+          <option value="lower">Lower Division</option>
+          <option value="upper">Upper Division</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterGE">GE Category</label>
+        <select id="filterGE">
+          <option value="">Any</option>
+          <option value="Ia">I. Lower-Division Writing</option>
+          <option value="Ib">I. Upper-Division Writing</option>
+          <option value="II">II. Science and Technology</option>
+          <option value="III">III. Social and Behavioral Sciences</option>
+          <option value="IV">IV. Arts and Humanities</option>
+          <option value="Va">Va. Quantitative Literacy</option>
+          <option value="Vb">Vb. Formal Reasoning</option>
+          <option value="VI">VI. Language Other Than English</option>
+          <option value="VII">VII. Multicultural Studies</option>
+          <option value="VIII">VIII. International/Global Issues</option>
+        </select>
+      </div>
+
+      <h3>Preferences</h3>
+
+      <div class="filter-group">
+        <label for="filterTime">Time of Day</label>
+        <select id="filterTime">
+          <option value="">Any Time</option>
+          <option value="morning">Morning (before 12 pm)</option>
+          <option value="afternoon">Afternoon (12–5 pm)</option>
+          <option value="evening">Evening (after 5 pm)</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="filterFormat">Format</label>
+        <select id="filterFormat">
+          <option value="">Any</option>
+          <option value="in-person">In-Person</option>
+          <option value="online">Online</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Max Units per Course</label>
+        <div class="range-row">
+          <input type="range" id="filterUnits" min="1" max="8" value="8" />
+          <span class="range-val" id="unitsVal">8</span>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-apply" onclick="applyFilters()">Apply Filters</button>
+      <button class="btn-reset" onclick="resetFilters()">Reset All</button>
+    </aside>
+
+    <!-- ===== Main Content ===== -->
+    <main class="main-content">
+
+      <!-- Search bar -->
+      <div class="search-bar-wrapper">
+        <span class="search-icon">&#128269;</span>
+        <input
+          type="text"
+          class="search-bar"
+          id="searchInput"
+          placeholder='Try "easy GE IV", "CS upper-div", or "no final exam"...'
+          autocomplete="off"
+        />
+      </div>
+
+      <!-- Quick-filter pills -->
+      <div class="quick-filters">
+        <button class="pill" data-filter="major">My Major</button>
+        <button class="pill" data-filter="ge">GE I Need</button>
+        <button class="pill" data-filter="no-prereq">No Prerequisites</button>
+        <button class="pill" data-filter="low-workload">Low Workload</button>
+        <button class="pill" data-filter="morning">Morning Only</button>
+        <button class="pill" data-filter="online">Online</button>
+      </div>
+
+      <!-- Results meta -->
+      <div class="results-meta">
+        <span>Showing <span class="count" id="resultCount">0</span> results</span>
+        <select class="sort-select" id="sortBy">
+          <option value="relevance">Sort by: Relevance</option>
+          <option value="match">Sort by: Match Score</option>
+          <option value="units-asc">Sort by: Units (low-high)</option>
+          <option value="units-desc">Sort by: Units (high-low)</option>
+          <option value="dept">Sort by: Department</option>
+        </select>
+      </div>
+
+      <!-- Loading indicator -->
+      <div class="loading-spinner" id="loadingSpinner">
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+
+      <!-- Course results list -->
+      <div class="results-list" id="resultsList">
+        <!-- Populated by JS / AJAX calls -->
+      </div>
+
+      <!-- Empty state (shown when no search yet) -->
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">&#128218;</div>
+        <h3>Start searching for courses</h3>
+        <p>Type a query above or use the filters to find courses that fit your schedule and goals.</p>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="static/js/SearchPage.js"></script>
+</body>
+</html>
