@@ -78,7 +78,7 @@ class CourseSearch():
             set_out.add(res[0])
 
     def search(self, year=None, quarter=None):
-        quarter = quarter.lower()
+        if quarter: quarter = quarter.lower()
         for major_id in self.majors:
             sql_out = filter_course_major(major_id, self.db_path)
             self._add_sqlite_result_to_set(sql_out, self.courses)
@@ -111,6 +111,24 @@ class CourseSearch():
             if prereqs_completed:
                 results.add(course)
         return results
+    
+    def search_ranked(self, year=None, quarter=None, k=10):
+        feasible = self.search(year, quarter)
+        ranked = []
+        for cid in feasible:
+            score, reasons = score_course_simple(
+                cid, self.db_path, self.majors, self.minors
+            )
+            meta = get_course_meta(cid, self.db_path)
+            
+            ranked.append({
+                "course_id": cid,
+                "score": score,
+                "reasons": reasons,
+                **meta
+            })
+        ranked.sort(key=lambda x: x["score"], reverse=True)
+        return ranked[:k]
     
 
 
@@ -315,7 +333,7 @@ def filter_course_major(major_id: str, db_path):
 def filter_course_minor(minor_id: str, db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    query = "SELECT course_id FROM Minors WHERE minor_id = ?"
+    query = "SELECT course_id FROM MinorCourses WHERE minor_id = ?"
     results = cursor.execute(query, (minor_id,)).fetchall()
 
     return results
@@ -328,6 +346,73 @@ def get_prerequisites(course_id: str, db_path):
     
     return results
 # def filter_prerequisites(course_id, db_path=DB_PATH):
+
+def get_course_meta(course_id: str, db_path: str):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    row = cur.execute("""
+        SELECT department, course_number, course_title, min_units, max_units
+        FROM Courses WHERE course_id = ?
+    """, (course_id,)).fetchone()
+    conn.close()
+
+    if not row:
+        return {"dept": "", "code": course_id, "title": course_id, "min_units": None, "max_units": None}
+
+    dept, num, title, min_u, max_u = row
+    return {"dept": dept, "code": f"{dept} {num}", "title": title, "min_units": min_u, "max_units": max_u}
+
+
+def is_major_course(course_id: str, major_id: str, db_path: str) -> bool:
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    hit = cur.execute("""
+        SELECT 1 FROM MajorCourses WHERE major_id = ? AND course_id = ? LIMIT 1
+    """, (major_id, course_id)).fetchone()
+    conn.close()
+    return hit is not None
+
+
+def is_minor_course(course_id: str, minor_id: str, db_path: str) -> bool:
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
+    hit = cur.execute("""
+        SELECT 1 FROM MinorCourses WHERE minor_id = ? AND course_id = ? LIMIT 1
+    """, (minor_id, course_id)).fetchone()
+    conn.close()
+    return hit is not None
+
+
+def score_course_simple(course_id: str, db_path: str, majors: set, minors: set):
+    # weights (tune later)
+    W_MAJOR = 4.0
+    W_MINOR = 2.0
+    W_NO_PREREQ = 0.5
+
+    score = 0.0
+    reasons = []
+
+    # Major relevance
+    for mid in majors:
+        if is_major_course(course_id, mid, db_path):
+            score += W_MAJOR
+            reasons.append("Required for your major")
+            break
+
+    # Minor relevance
+    for nid in minors:
+        if is_minor_course(course_id, nid, db_path):
+            score += W_MINOR
+            reasons.append("Counts toward your minor")
+            break
+
+    # Bonus: no prereqs
+    prereqs = get_prerequisites(course_id, db_path)
+    if len(prereqs) == 0:
+        score += W_NO_PREREQ
+        reasons.append("No prerequisites")
+
+    return score, reasons[:3]
 
 def main():
     with open("all_course_data.json", "r") as f:
