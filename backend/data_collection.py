@@ -7,10 +7,13 @@ import time
 COURSEDATA_URL = "https://anteaterapi.com/v2/rest/coursesCursor" # load API url
 MAJOR_URL = "https://anteaterapi.com/v2/rest/programs/majors"
 MINOR_URL = "https://anteaterapi.com/v2/rest/programs/minors"
+SPECIALIZATION_URL = "https://anteaterapi.com/v2/rest/programs/specializations"
 TERM_URL = "https://anteaterapi.com/v2/rest/websoc/terms"
 
 TAKE = 100 # load data in batches
 SLEEP_TIME = 0.5 # avoid overloading api
+
+LOADING_CHARS = ['|', '/', '—', '\\']
 
 def fetch_courses(cursor=None, take=TAKE):
     batch_number = 1
@@ -71,7 +74,12 @@ def fetch_majors():
     all_major_data = []
 
     # retrieve all major ids and extract data from api
+    num_chars = 0
     for major in majors:
+        num_chars = ((num_chars) % 3) + 1
+        loading = '.' * num_chars + ' ' * (3 - num_chars)
+        print(f"Retrieving Majors{loading}", end='\r')
+        
         program_id = major["id"]
         URL = f"https://anteaterapi.com/v2/rest/programs/major?programId={program_id}"
         response = requests.get(URL)
@@ -89,7 +97,7 @@ def fetch_majors():
     with open("all_major_data.json", "w") as f:
         json.dump(all_major_data, f, indent=2)
 
-    print(f"Saved {len(all_major_data)} majors.")
+    print(f"\nSaved {len(all_major_data)} majors.")
 
 def fetch_minors():
     response = requests.get(MINOR_URL)
@@ -104,7 +112,12 @@ def fetch_minors():
     all_minor_data = []
 
     # retrieve all minor ids and extract data from api
+    num_chars = 0
     for minor in minors:
+        num_chars = ((num_chars) % 3) + 1
+        loading = '.' * num_chars + ' ' * (3 - num_chars)
+        print(f"Retrieving Minors{loading}", end='\r')
+        
         program_id = minor["id"]
         URL = f"https://anteaterapi.com/v2/rest/programs/minor?programId={program_id}"
         response = requests.get(URL)
@@ -122,10 +135,45 @@ def fetch_minors():
     with open("all_minor_data.json", "w") as f:
         json.dump(all_minor_data, f, indent=2)
 
-    print(f"Saved {len(all_minor_data)} minors.")
+    print(f"\nSaved {len(all_minor_data)} minors.")
 
 def fetch_specializations():
-    pass
+    response = requests.get(SPECIALIZATION_URL)
+    response.raise_for_status()
+    specializations = response.json().get("data", [])
+
+    # check if data exists
+    if specializations is None:
+        return []
+    
+    # fetch requirements for each specializations
+    all_specialization_data = []
+
+    # retrieve all specialization ids and extract data from api
+    num_chars = 0
+    for specialization in specializations:
+        num_chars = ((num_chars) % 3) + 1
+        loading = '.' * num_chars + ' ' * (3 - num_chars)
+        print(f"Retrieving Specializations{loading}", end='\r')
+        
+        spec_id = specialization["id"]
+        URL = f"https://anteaterapi.com/v2/rest/programs/specialization?programId={spec_id}"
+        response = requests.get(URL)
+        response.raise_for_status()
+        requirements = response.json().get("data", [])
+
+        # merge major information with requirements
+        spec_copy = specialization.copy()
+        spec_copy["requirements"] = requirements
+
+        all_specialization_data.append(spec_copy)
+        time.sleep(SLEEP_TIME)  # sleep 100ms between requests --> avoid client error
+    
+    # write to json file
+    with open("all_specialization_data.json", "w") as f:
+        json.dump(all_specialization_data, f, indent=2)
+
+    print(f"\nSaved {len(all_specialization_data)} specializations.")
 
 def fetch_terms():
     response = requests.get(TERM_URL)
@@ -163,8 +211,8 @@ def fetch_term_info(year, quarter):
                     for meeting in section.get("meetings", []):
                         meeting_location = meeting.get("bldg")
                         if (meeting_location is None):
-                            building = None
-                            room = None
+                            building = "TBA"
+                            room = ""
                         elif (meeting_location[0] == "TBA "):
                             building = "TBA"
                             room = ""
@@ -176,12 +224,19 @@ def fetch_term_info(year, quarter):
                             "department": dept_code, 
                             "courseNumber": course.get("courseNumber"),
                             "sectionCode": section.get("sectionCode"),
+                            "sectionType": section.get("sectionType"),
                             "buildingCode": building,
                             "roomNumber": room,
                             "startTime": meeting.get("startTime"),
                             "endTime": meeting.get("endTime"),
                             "days": meeting.get("days"),
-                            "term": f"{year} {quarter}"
+                            "term": f"{year} {quarter}",
+                            "restrictions": section.get("restrictions"),
+                            "maxCapacity": section.get("maxCapacity"),
+                            "numCurrentlyEnrolled":  section.get("numCurrentlyEnrolled"),
+                            "numWaitlistCap": section.get("numWaitlistCap"),
+                            "numOnWaitlist": section.get("numOnWaitlist"),
+                            "isCancelled": section.get("isCancelled")
                         })
 
     return extracted
@@ -219,8 +274,10 @@ def merge_offerings(all_courses, offerings):
                 break
 
 if __name__ == "__main__":
+
     fetch_majors()
     fetch_minors()
+    fetch_specializations()    
 
     all_courses = fetch_courses()
     # with open("all_course_data.json", "r") as f:
