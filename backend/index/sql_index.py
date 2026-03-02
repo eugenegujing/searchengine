@@ -23,12 +23,15 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
         Courses: General course information
         GenEdRequirements: Stores which courses fulfill each GE category
         Majors: General major information
-        MajorCourses: Stores required courses for each major
+        MajorRequirements: Requirements needed to graduate with a given major
+        MajorCourses: Stores required courses for each major as well as whcih requirements they fulfill
         Minors: General minor information
-        MinorCourses: Stores required courses for each minor
+        MinorRequirements: Requirements needed to graduate with a given minor
+        MinorCourses: Stores required courses for each minor as well as which requirements they fulfill
         Prerequisites: Stores which courses have prerequisites
         Specializations: Specialization information
-        SpecializationCourses Stores required courses for each specialization
+        SpecializationRequirements: Requirements for each specialization
+        SpecializationCourses Stores required courses for each specialization as well as which requirements they fulfill
         Terms: Stores term-specific course information
     
     """
@@ -182,7 +185,7 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
             specialization_id TEXT,
             requirement_type TEXT,
             requirement_label TEXT,
-            requirement_count TEXT,
+            requirement_count INTEGER,
             parent_label TEXT,
             PRIMARY KEY (specialization_id, requirement_label),
             FOREIGN KEY (specialization_id) REFERENCES Specializations(specialization_id)
