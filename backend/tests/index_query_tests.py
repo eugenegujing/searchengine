@@ -216,7 +216,7 @@ class TestCourseSearch(unittest.TestCase):
                      "ENGRMAE108", "ENGRMAE110"]
         for course in completed:
             course_search.add_prerequisite(course)
-        res = course_search.get_major_requirement_completion()
+        res = course_search.get_all_major_requirement_completion()
         completed_reqs, in_progress, not_started = res[majors[0]]
         self.assertIn('I&CSCI H32, 33', completed_reqs)
         self.assertIn('I&CSCI 31, 32, 33', in_progress)
@@ -237,6 +237,113 @@ class TestCourseSearch(unittest.TestCase):
         completed_reqs, in_progress, not_started = res[majors[1]]
         self.assertTrue("4 Add'l units in Upper-Div School of ENGR courses" in completed_reqs)
         self.assertTrue("8 units of Upper-Div ENGRMAE Courses" in completed_reqs)
+
+    def test_course_search_major_and_minor_requirements(self):
+        major = "BS-277"
+        minor = "459"
+        completed = ["I&CSCIH32", "I&CSCI33", "I&CSCI6B",
+                     "I&CSCI6D", "I&CSCI45C", "I&CSCI46", 
+                     "I&CSCI51", "COMPSCI161","ENGRMAE108", 
+                     "ENGRMAE110"]
+        course_search = CourseSearch(TEST_DB_PATH)
+        course_search.add_major(major)
+        course_search.add_minor(minor)
+        for course in completed:
+            course_search.add_prerequisite(course)
+        
+        completed_reqs, in_progress, not_started = course_search.get_major_requirement_completion(major)
+        self.assertTrue("4 Add'l units in Upper-Div School of ENGR courses" in completed_reqs)
+        self.assertTrue("8 units of Upper-Div ENGRMAE Courses" in completed_reqs)
+        
+        completed_reqs, in_progress, not_started = course_search.get_minor_requirement_completion(minor)
+        self.assertIn('I&CSCI 31+32 or I&CSCI H32', completed_reqs)
+        self.assertIn('I&C Sci H32', completed_reqs)
+        self.assertIn('I&C Sci 6D', completed_reqs)
+        self.assertIn('I&C Sci 45C', completed_reqs)
+        self.assertIn('I&C Sci 46', completed_reqs)
+        self.assertIn('I&C Sci 51 or IN4MATX 43', completed_reqs)
+        self.assertIn('2 upper-div courses from list', in_progress)
+
+    def test_course_search_specialization_incomplete(self):
+        major = "BS-201"
+        specialization = "BS-201F"
+        completed = ["I&CSCIH32", "I&CSCI33", "I&CSCI6B",
+                     "I&CSCI6D", "I&CSCI6N", "IN4MATX43",
+                     "I&CSCI45C", "I&CSCI46", "I&CSCI51",
+                     "I&CSCI53", "MATH2B", "STATS67",
+                     "MATH2A", "COMPSCI161", "COMPSCI171",
+                     "COMPSCI178", "COMPSCI125", "COMPSCI121", 
+                     "COMPSCI122A", "COMPSCI122B"]
+
+        course_search = CourseSearch(TEST_DB_PATH)
+        course_search.add_major(major)
+        course_search.add_specialization(specialization)
+        for course in completed:
+            course_search.add_prerequisite(course)
+        completed_reqs, in_progress, not_started = course_search.get_major_requirement_completion(major)
+        self.assertIn('I&CSCI H32, 33', completed_reqs)
+        self.assertIn('I&CSCI 31, 32, 33', in_progress)
+        self.assertIn('I&CSci 6B', completed_reqs)
+        self.assertIn('I&CSci 6D', completed_reqs)
+        self.assertIn('I&CSci 6N or Math 3A', completed_reqs)
+        self.assertIn('In4matx 43', completed_reqs)
+        self.assertIn('Math 2A', completed_reqs)
+        self.assertIn('Math 2B', completed_reqs)
+        self.assertIn('Stats 67', completed_reqs)
+        self.assertIn('CompSci 161', completed_reqs)
+        self.assertIn('I&CSci 51', completed_reqs)
+        self.assertIn('I&CSci 53', completed_reqs)
+        self.assertIn('2 Project Courses', completed_reqs)
+        self.assertIn('11 Upper-Div Electives', in_progress)
+        self.assertIn('2 GE II courses (except ECON, MATH, School of Engineering or School of ICS courses)', not_started)
+
+        completed_reqs, in_progress, not_started = course_search.get_specialization_requirement_completion(specialization)
+        self.assertIn("CompSci 122B, 122C, 122D, 125, or 179", completed_reqs)
+        self.assertIn("CompSci 122A", completed_reqs)
+        self.assertIn("CompSci 121", completed_reqs)
+        self.assertIn("CompSci 178", completed_reqs)
+        self.assertIn("3 Add'l classes from list", in_progress)
+        
+
+    def test_course_search_specialization_complete(self):
+        completed = ["I&CSCIH32", "I&CSCI33", "I&CSCI6B",
+                     "I&CSCI6D", "I&CSCI6N", "IN4MATX43",
+                     "I&CSCI45C", "I&CSCI46", "I&CSCI51",
+                     "I&CSCI53", "MATH2B", "STATS67",
+                     "MATH2A", "COMPSCI161", "COMPSCI171",
+                     "COMPSCI178", "COMPSCI125", "COMPSCI121", 
+                     "COMPSCI122A", "COMPSCI122B", "COMPSCI141",
+                     "COMPSCI179"]
+        major = "BS-201"
+        specialization = "BS-201F"
+        course_search = CourseSearch(TEST_DB_PATH)
+        course_search.add_major(major)
+        course_search.add_specialization(specialization)
+        for course in completed:
+            course_search.add_prerequisite(course)
+        completed_reqs, in_progress, not_started = course_search.get_major_requirement_completion(major)
+        self.assertIn('I&CSCI H32, 33', completed_reqs)
+        self.assertIn('I&CSCI 31, 32, 33', in_progress)
+        self.assertIn('I&CSci 6B', completed_reqs)
+        self.assertIn('I&CSci 6D', completed_reqs)
+        self.assertIn('I&CSci 6N or Math 3A', completed_reqs)
+        self.assertIn('In4matx 43', completed_reqs)
+        self.assertIn('Math 2A', completed_reqs)
+        self.assertIn('Math 2B', completed_reqs)
+        self.assertIn('Stats 67', completed_reqs)
+        self.assertIn('CompSci 161', completed_reqs)
+        self.assertIn('I&CSci 51', completed_reqs)
+        self.assertIn('I&CSci 53', completed_reqs)
+        self.assertIn('2 Project Courses', completed_reqs)
+        self.assertIn('11 Upper-Div Electives', in_progress)
+        self.assertIn('2 GE II courses (except ECON, MATH, School of Engineering or School of ICS courses)', not_started)
+
+        completed_reqs, in_progress, not_started = course_search.get_specialization_requirement_completion(specialization)
+        self.assertIn("CompSci 122B, 122C, 122D, 125, or 179", completed_reqs)
+        self.assertIn("CompSci 122A", completed_reqs)
+        self.assertIn("CompSci 121", completed_reqs)
+        self.assertIn("CompSci 178", completed_reqs)
+        self.assertIn("3 Add'l classes from list", completed_reqs)
 
 if __name__ == "__main__":
     if (CREATE_TEST_DB):
