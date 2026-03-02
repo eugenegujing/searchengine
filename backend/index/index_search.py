@@ -103,23 +103,82 @@ class CourseSearch():
                 results.add(course)
         return results
     
-    def get_major_requirement_completion(self):
+    def get_all_major_requirement_completion(self) -> dict:
         """
-        returns a dictionary containing requirement completion information for each major
+        Retrieves requirement completion information for each major
 
-        Return format:
+        Out:
             Key: major id
             Value: tuple with requirement information => (completed, in progress, not started)
         """
         res = {}
         for major in self.majors:
-            res[major] = filter_major_requirements(self.db_path, major, self.completed)
+            res[major] = self.get_major_requirement_completion(major)
         
         return res
         
+    def get_major_requirement_completion(self, major_id) -> tuple:
+        """
+        Retrieves requirement completion information for select major
+
+        Out:
+            tuple with requirement information => (completed, in progress, not started)
+        """
+        return filter_major_requirements(self.db_path, major_id, self.completed)
     
-    def get_minor_requirement_completion(self):
-        pass
+    def get_all_minor_requirement_completion(self) -> dict:
+        """
+        Retrieves requirement completion information for each major
+
+        Out:
+            Key: minor id
+            Value: tuple with requirement information => (completed, in progress, not started)
+        """
+        res = {}
+        for minor in self.minors:
+            res[minor] = self.get_minor_requirement_completion(minor)
+        
+        return res
+    
+    def get_minor_requirement_completion(self, minor_id) -> tuple:
+        """
+        Retrieves requirement completion information for select major
+
+        Out:
+            tuple with requirement information => (completed, in progress, not started)
+        """
+        return filter_minor_requirements(self.db_path, minor_id, self.completed)
+    
+    def get_all_specialization_requirement_completion(self, all_major_specializations=False) -> dict:
+        """
+        Retrieves specialization completion based on major(s) and completed courses
+        If all_major_specializations is True, returns completion status for all specializations within each major
+
+        Out: 
+            Keys: specialization id
+            Values: tuple containing requirement status => (completed, in_progress, not_started)
+        """
+        major_specializations = self.specializations
+        res = {}
+        if (all_major_specializations):
+            major_specializations = []
+            for major in self.majors:
+                specializations = get_specializations(self.db_path, major)
+                major_specializations.extend(specializations)
+        
+            for specialization in major_specializations:
+                res[specialization] = self.get_specialization_requirement_completion(specialization)
+        
+        return res
+    
+    def get_specialization_requirement_completion(self, specialization_id):
+        """
+        Retrieves requirement completion information for select specialization
+
+        Out:
+            tuple with requirement information => (completed, in progress, not started)
+        """
+        return filter_specialization_requirements(self.db_path, specialization_id, self.completed)
 
 #===================================================================================
 
@@ -128,15 +187,31 @@ def get_majors(db_path):
     cursor = conn.cursor()
     return cursor.execute("SELECT * FROM Majors").fetchall()
 
+def get_major_data(db_path, major_id):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    return cursor.execute("SELECT * FROM Majors WHERE major_id = ?", (major_id,)).fetchone()
+
 def get_minors(db_path):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     return cursor.execute("SELECT * FROM Minors").fetchall()
 
+def get_minor_data(db_path, minor_id):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    return cursor.execute("SELECT * FROM Minors WHERE minor_id = ?", (minor_id,)).fetchone()
+
 def get_specializations(db_path, major):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    return cursor.execute("SELECT specialization_id, specialization_name FROM Specializations").fetchall()
+    return cursor.execute("SELECT specialization_id, specialization_name FROM Specializations WHERE major_id = ?",
+                          (major,)).fetchall()
+                          
+def get_specialization_data(db_path, specialization_id):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    return cursor.execute("SELECT * FROM Specializations WHERE specialization_id = ?", (specialization_id,)).fetchone()
 
 
 def filter_course_term(year: int, quarter: str, db_path):
