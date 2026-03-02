@@ -202,51 +202,24 @@ def filter_major_requirements(db_path, major, completed_courses: list=None):
         completed_courses = []
     completed_courses = completed_courses.copy()
 
-
-    course_query = """
-        SELECT group_label, course_count, requirement_label FROM MajorCourses 
-        WHERE major_id = ? AND group_label IS NOT NULL
-    """
-    course_group_data = set(cursor.execute(course_query, (major,)).fetchall())
-    
     parent_requirements = defaultdict(set)
     complete = defaultdict(list)
     in_progress = defaultdict(list)
     not_started = set()
-    completion = {
-        "complete": defaultdict(set),
-        "inProgress": defaultdict(set),
-        "notStarted": defaultdict(set)
-    }
-    completed_units = defaultdict(int)
-    in_progress_requirements = defaultdict(set)
-    incomplete_requirements = set()
+    
 
     # for course based requirements
 
-    for group in course_group_data:
-        group_label = group[0]
-        course_count = group[1]
-        parent_requirement = group[2]
-        completed_in_group = []
+    course_group_query = """
+        SELECT group_label, course_count, requirement_label FROM MajorCourses 
+        WHERE major_id = ? AND group_label IS NOT NULL
+    """
+    course_query = "SELECT course_id, course_count FROM MajorCourses WHERE group_label = ?"
 
-        if (parent_requirement):
-            parent_requirements[parent_requirement].add(group_label)
-
-        courses = cursor.execute("SELECT course_id, course_count FROM MajorCourses WHERE group_label = ?", (group_label,)).fetchall()
-        for course in set(courses):
-            course_id = course[0]
-            if (course_id in completed_courses):
-                completed_in_group.append(course_id)
-
-        n_completed = len(completed_in_group)
-        if (n_completed >= course_count):
-            complete[group_label] = completed_in_group
-        elif (n_completed > 0):
-            in_progress[group_label] = completed_in_group
-        else:
-            not_started.add(group_label)
-
+    course_group_data = set(cursor.execute(course_group_query, (major,)).fetchall())
+    _handle_course_group_requirements(cursor, course_group_data, course_query,
+                                      completed_courses, parent_requirements, 
+                                      complete, in_progress, not_started)
 
     # for unit based requirements
 
@@ -257,63 +230,227 @@ def filter_major_requirements(db_path, major, completed_courses: list=None):
         SELECT requirement_label FROM MajorCourses 
         WHERE major_id = ? AND group_label IS NULL
     """
+    unit_courses_query = "SELECT course_id FROM MajorCourses WHERE requirement_label = ?"
     unit_requirements = set(cursor.execute(unit_query, (major,)).fetchall())
-    for requirement_group in unit_requirements:
-        requirement_label = requirement_group[0]
-        courses = cursor.execute("SELECT course_id FROM MajorCourses WHERE requirement_label = ?", (requirement_label,)).fetchall()
-        requirement_courses = set(query_result_to_list(courses))
-        completed_unit_courses = []
-        completed_units = 0
+    _process_completed_unit_courses(cursor, unit_courses_query, unit_requirements,
+                                    completed_courses, completed_req_courses,
+                                    not_started)
+
+    unit_requirement_query = """
+        SELECT requirement_type, requirement_count, parent_label
+        FROM MajorRequirements 
+        WHERE major_id = ? AND requirement_label = ? 
+    """
+    _process_completed_unit_requirements(cursor, unit_requirement_query, major,
+                                         completed_req_courses, parent_requirements,
+                                         complete, in_progress, not_started)
         
-        for course in completed_courses:
-            if (course in requirement_courses):
-                completed_unit_courses.append(course)
+    parent_requirement_query = """
+        SELECT requirement_type, requirement_count, parent_label
+        FROM MajorRequirements 
+        WHERE major_id = ? AND requirement_label = ?
+    """
+    _handle_parent_requirements(cursor, parent_requirement_query, major,
+                                parent_requirements, complete, in_progress, not_started)
 
-        if (len(completed_unit_courses) > 0):
-            # completed_req_units[requirement_label] = completed_units
-            completed_req_courses[requirement_label].append(completed_unit_courses)
-        else:
-            not_started.add(requirement_group)
+    # find requirements with no child courses
+    query = """
+        SELECT requirement_label
+        FROM MajorRequirements 
+        WHERE major_id = ?
+    """
+    requirements = set(query_result_to_list(cursor.execute(query, (major,)).fetchall()))
+    not_started = not_started.union(get_requirements_with_no_child_courses(requirements, complete, in_progress))
 
+    return (complete, in_progress, not_started)
+
+def filter_minor_requirements(db_path, minor, completed_courses: list=None):
+    """
+    Retrieves requirement progress for a given minor based on already completed courses
+
+    Out:
+        complete=> dictionary containing titles of requirements as keys and which classes contributed towards it as values
+
+        in_progress=> dictionary containing same corresponding data as above
+
+        not_started=> set containing titles of requirements with no courses completed
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    if (completed_courses is None):
+        completed_courses = []
+    completed_courses = completed_courses.copy()
+
+    parent_requirements = defaultdict(set)
+    complete = defaultdict(list)
+    in_progress = defaultdict(list)
+    not_started = set()
     
-    while (len(completed_req_courses) > 0):
-        # label, units_completed = completed_req_units.popitem()
-        label, courses_completed = completed_req_courses.popitem()
-        courses_completed = merge_requirement_course_lists(courses_completed)
-        query = """
-            SELECT requirement_type, requirement_count, parent_label
-            FROM MajorRequirements 
-            WHERE major_id = ? AND requirement_label = ? 
-        """
-        requirement = cursor.execute(query, (major, label)).fetchall()[0]
-        req_type = requirement[0]
-        req_count = requirement[1]
-        parent = requirement[2]
-        units_completed = get_units_from_course_lists(courses_completed, cursor=cursor)
-        if (parent and req_type == "Unit"):
-            completed_req_courses[parent].append(courses_completed)
 
-        if (req_type == "Unit" and units_completed >= req_count):
-            complete[label] = merge_requirement_courses(complete[label], courses_completed)
+    # for course based requirements
 
-        elif (req_type == "Unit" and units_completed > 0):
-            in_progress[label] = merge_requirement_courses(complete[label], courses_completed)
+    course_group_query = """
+        SELECT group_label, course_count, requirement_label FROM MinorCourses 
+        WHERE minor_id = ? AND group_label IS NOT NULL
+    """
+    course_query = "SELECT course_id, course_count FROM MinorCourses WHERE group_label = ?"
 
-        if (parent):
-            parent_requirements[parent].add(label)
+    course_group_data = set(cursor.execute(course_group_query, (minor,)).fetchall())
+    _handle_course_group_requirements(cursor, course_group_data, course_query,
+                                      completed_courses, parent_requirements, 
+                                      complete, in_progress, not_started)
+
+    # for unit based requirements
+
+    completed_req_units = {}
+    completed_req_courses = defaultdict(list)
+
+    unit_query = """
+        SELECT requirement_label FROM MinorCourses 
+        WHERE minor_id = ? AND group_label IS NULL
+    """
+    unit_courses_query = "SELECT course_id FROM MinorCourses WHERE requirement_label = ?"
+    unit_requirements = set(cursor.execute(unit_query, (minor,)).fetchall())
+    _process_completed_unit_courses(cursor, unit_courses_query, unit_requirements,
+                                    completed_courses, completed_req_courses,
+                                    not_started)
+
+    unit_requirement_query = """
+        SELECT requirement_type, requirement_count, parent_label
+        FROM MinorRequirements 
+        WHERE minor_id = ? AND requirement_label = ? 
+    """
+    _process_completed_unit_requirements(cursor, unit_requirement_query, minor,
+                                         completed_req_courses, parent_requirements,
+                                         complete, in_progress, not_started)
         
+    parent_requirement_query = """
+        SELECT requirement_type, requirement_count, parent_label
+        FROM MinorRequirements 
+        WHERE minor_id = ? AND requirement_label = ?
+    """
+    _handle_parent_requirements(cursor, parent_requirement_query, minor,
+                                parent_requirements, complete, in_progress, not_started)
+
+    # find requirements with no child courses
+    query = """
+        SELECT requirement_label
+        FROM MinorRequirements 
+        WHERE minor_id = ?
+    """
+    requirements = set(query_result_to_list(cursor.execute(query, (minor,)).fetchall()))
+    not_started = not_started.union(get_requirements_with_no_child_courses(requirements, complete, in_progress))
+
+    return (complete, in_progress, not_started)
+
+
+def filter_specialization_requirements(db_path, specialization, completed_courses: list=None):
+    """
+    Retrieves requirement progress for a given specialization based on already completed courses
+
+    Out:
+        complete=> dictionary containing titles of requirements as keys and which classes contributed towards it as values
+
+        in_progress=> dictionary containing same corresponding data as above
+
+        not_started=> set containing titles of requirements with no courses completed
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    if (completed_courses is None):
+        completed_courses = []
+    completed_courses = completed_courses.copy()
+
+    parent_requirements = defaultdict(set)
+    complete = defaultdict(list)
+    in_progress = defaultdict(list)
+    not_started = set()
+
+    # for course based requirements
+
+    course_group_query = """
+        SELECT group_label, course_count, requirement_label FROM SpecializationCourses 
+        WHERE specialization_id = ? AND group_label IS NOT NULL
+    """
+    course_query = "SELECT course_id, course_count FROM SpecializationCourses WHERE group_label = ?"
+
+    course_group_data = set(cursor.execute(course_group_query, (specialization,)).fetchall())
+    _handle_course_group_requirements(cursor, course_group_data, course_query,
+                                      completed_courses, parent_requirements, 
+                                      complete, in_progress, not_started)                                     
+
+    # for unit based requirements
+
+    completed_req_units = {}
+    completed_req_courses = defaultdict(list)
+
+    unit_query = """
+        SELECT requirement_label FROM SpecializationCourses 
+        WHERE specialization_id = ? AND group_label IS NULL
+    """
+    unit_courses_query = "SELECT course_id FROM SpecializationCourses WHERE requirement_label = ?"
+    unit_requirements = set(cursor.execute(unit_query, (specialization,)).fetchall())
+    _process_completed_unit_courses(cursor, unit_courses_query, unit_requirements,
+                                    completed_courses, completed_req_courses,
+                                    not_started)
     
+    unit_requirement_query = """
+        SELECT requirement_type, requirement_count, parent_label
+        FROM SpecializationRequirements 
+        WHERE specialization_id = ? AND requirement_label = ? 
+    """
+    _process_completed_unit_requirements(cursor, unit_requirement_query, specialization,
+                                         completed_req_courses, parent_requirements,
+                                         complete, in_progress, not_started)
+        
+    parent_requirement_query = """
+        SELECT requirement_type, requirement_count, parent_label
+        FROM SpecializationRequirements 
+        WHERE specialization_id = ? AND requirement_label = ?
+    """
+    _handle_parent_requirements(cursor, parent_requirement_query, specialization,
+                                parent_requirements, complete, in_progress, not_started)
+
+    # find requirements with no child courses
+    query = """
+        SELECT requirement_label
+        FROM SpecializationRequirements 
+        WHERE specialization_id = ?
+    """
+    requirements = set(query_result_to_list(cursor.execute(query, (specialization,)).fetchall()))
+    not_started = not_started.union(get_requirements_with_no_child_courses(requirements, complete, in_progress))
+
+    return (complete, in_progress, not_started)
+
+def _handle_course_group_requirements(cursor, course_group_data, course_query,
+                                      completed_courses, parent_requirements, 
+                                      complete, in_progress, not_started):
+
+    for group in course_group_data:
+        group_label = group[0]
+        course_count = group[1]
+        parent_requirement = group[2]
+        completed_in_group = []
+
+        if (parent_requirement):
+            parent_requirements[parent_requirement].add(group_label)
+
+        courses = cursor.execute(course_query, (group_label,)).fetchall()
+        _process_course_requirement(completed_courses, courses, completed_in_group,
+                                    course_count, group_label, complete, in_progress,
+                                    not_started)
+        
+def _handle_parent_requirements(cursor, requirement_query, query_id, parent_requirements,
+                                complete, in_progress, not_started):
     while (len(parent_requirements) > 0):
 
         requirement_label, children_reqs = parent_requirements.popitem()
         completed_requirements = complete.keys()
         in_progress_requirements = in_progress.keys()
-        query = """
-                SELECT requirement_type, requirement_count, parent_label
-                FROM MajorRequirements 
-                WHERE major_id = ? AND requirement_label = ?
-                """
-        requirement = cursor.execute(query, (major, requirement_label)).fetchall()[0]
+        
+        requirement = cursor.execute(requirement_query, (query_id, requirement_label)).fetchall()[0]
         req_type = requirement[0]
         req_count = requirement[1]
         parent = requirement[2]
@@ -330,15 +467,121 @@ def filter_major_requirements(db_path, major, completed_courses: list=None):
                 req_completed_courses = merge_requirement_courses(req_completed_courses, complete[child])
             elif (child in in_progress_requirements):
                 n_in_progress += 1
-                req_completed_courses = merge_requirement_courses(req_completed_courses, complete[child])
+                req_completed_courses = merge_requirement_courses(req_completed_courses, in_progress[child])
             
-        if (n_req_completed > req_count):
+        if (req_type == "Unit"):
+            n_req_completed = get_units_from_course_lists(req_completed_courses)
+
+        if (n_req_completed >= req_count):
             complete[requirement_label] = req_completed_courses
         elif (n_req_completed > 0):
             in_progress[requirement_label] = req_completed_courses
+        else:
+            not_started.add(requirement_label)
 
-    return (complete, in_progress, not_started)
 
+def _process_course_requirement(completed_courses, courses, completed_in_group,
+                                course_count, group_label, complete, in_progress,
+                                not_started):
+    for course in set(courses):
+        course_id = course[0]
+        if (course_id in completed_courses):
+            completed_in_group.append(course_id)
+
+    n_completed = len(completed_in_group)
+    if (n_completed >= course_count):
+        complete[group_label] = completed_in_group
+    elif (n_completed > 0):
+        in_progress[group_label] = completed_in_group
+    else:
+        not_started.add(group_label)
+
+def _process_unit_course(completed_courses, requirement_courses,
+                         completed_req_courses, requirement_label,
+                         not_started, requirement_group):
+    
+    completed_unit_courses = []
+    
+    for course in completed_courses:
+        if (course in requirement_courses):
+            completed_unit_courses.append(course)
+
+    if (len(completed_unit_courses) > 0):
+        # completed_req_units[requirement_label] = completed_units
+        completed_req_courses[requirement_label].append(completed_unit_courses)
+    else:
+        not_started.add(requirement_group)
+
+def _process_completed_unit_courses(cursor, courses_query, unit_requirements, 
+                                    completed_courses, completed_req_courses, 
+                                    not_started):
+    
+    for requirement_group in unit_requirements:
+        requirement_label = requirement_group[0]
+        courses = cursor.execute(courses_query, (requirement_label,)).fetchall()
+        requirement_courses = set(query_result_to_list(courses))
+        _process_unit_course(completed_courses, requirement_courses, 
+                             completed_req_courses, requirement_label,
+                             not_started, requirement_group)
+
+def _process_completed_unit_requirements(cursor, requirement_query, query_id,
+                                         completed_req_courses, parent_requirements,
+                                         complete, in_progress, not_started):
+    
+    while (len(completed_req_courses) > 0):
+        # label, units_completed = completed_req_units.popitem()
+        label, courses_completed = completed_req_courses.popitem()
+        courses_completed = merge_requirement_course_lists(courses_completed)
+        requirement = cursor.execute(requirement_query, (query_id, label)).fetchall()[0]
+        req_type = requirement[0]
+        req_count = requirement[1]
+        parent = requirement[2]
+        units_completed = get_units_from_course_lists(courses_completed, cursor=cursor)
+        _process_unit_requirement(courses_completed, units_completed, parent,
+                                 parent_requirements, label, req_type,
+                                 req_count, complete, in_progress, not_started)
+
+def _process_unit_requirement(courses_completed, units_completed, 
+                              parent, parent_requirements, label, 
+                              req_type, req_count, complete, 
+                              in_progress, not_started):
+    
+    if (req_type == "Unit" and units_completed >= req_count):
+        complete[label] = merge_requirement_courses(complete[label], courses_completed)
+
+    elif (req_type == "Unit" and units_completed > 0):
+        in_progress[label] = merge_requirement_courses(in_progress[label], courses_completed)
+
+    else:
+        not_started.add(label)
+
+    if (parent):
+        parent_requirements[parent].add(label)
+        
+
+def get_units_from_course_lists(course_list: list, cursor=None, db_path=None):
+    if (cursor is None and db_path is None):
+        raise CourseSearchException("Must provide either database cursor or database path")
+    if (cursor is None):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+    course_counts = defaultdict(int)
+    for course in course_list:
+        course_counts[course] = max(course_counts[course], course_list.count(course))
+
+    res = 0
+    for course, course_count in course_counts.items():
+        n_units = cursor.execute("SELECT min_units FROM Courses WHERE course_id = ?", (course,)).fetchall()[0][0]
+        res += n_units * course_count
+
+    return res
+
+def get_requirements_with_no_child_courses(requirements: set, complete: dict, in_progress: dict):
+    res = set()
+    for requirement in requirements:
+        if ((requirement not in complete.keys()) and (requirement not in in_progress.keys())):
+            res.add(requirement)
+    return res
 
 def get_units_from_course_lists(course_list: list, cursor=None, db_path=None):
     if (cursor is None and db_path is None):

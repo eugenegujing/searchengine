@@ -17,7 +17,8 @@ N_TERMS = 5
 TO RUN TESTS:
 
 In the backend folder run:
-    python -m Tests.index_query_tests
+    all tests: python -m Tests.index_query_tests
+    specific test: python -m unittest Tests.index_query_tests.[testClass].[testName]
 """
 
 class TestSQLIndex(unittest.TestCase):
@@ -109,7 +110,8 @@ class TestSQLIndex(unittest.TestCase):
                      "COMPSCI178", "COMPSCI125"]
         completed_reqs, in_progress, not_started = filter_major_requirements(TEST_DB_PATH, major, completed)
         self.assertIn('I&CSCI H32, 33', completed_reqs)
-        self.assertIn('I&CSCI 31, 32, 33', completed_reqs)
+        self.assertIn('I&CSCI 31, 32, 33', in_progress)
+        self.assertIn('Select I&CSCI 31-32-33 or I&CSCI H32-33', completed_reqs)
         self.assertIn('I&CSci 6B', completed_reqs)
         self.assertIn('I&CSci 6D', completed_reqs)
         self.assertIn('I&CSci 6N or Math 3A', completed_reqs)
@@ -118,13 +120,13 @@ class TestSQLIndex(unittest.TestCase):
         self.assertIn('Math 2B', completed_reqs)
         self.assertIn('Stats 67', completed_reqs)
         self.assertIn('CompSci 161', completed_reqs)
+        self.assertIn('I&CSci 45C', completed_reqs)
+        self.assertIn('I&CSci 46', completed_reqs)
         self.assertIn('I&CSci 51', completed_reqs)
         self.assertIn('I&CSci 53', completed_reqs)
         self.assertIn('2 Project Courses', in_progress)
         self.assertIn('11 Upper-Div Electives', in_progress)
         self.assertIn('2 GE II courses (except ECON, MATH, School of Engineering or School of ICS courses)', not_started)
-        
-        
     
     def test_all_major_requirements(self):
         major = "BS-201"
@@ -132,7 +134,30 @@ class TestSQLIndex(unittest.TestCase):
         completed_reqs, in_progress, not_started = filter_major_requirements(TEST_DB_PATH, major, completed)
         self.assertEqual(len(in_progress), 0)
         self.assertEqual(len(not_started), 1) # Select a specialization
-        
+
+    def test_major_requirements_no_progress(self):
+        major = "BS-201"
+        completed_reqs, in_progress, not_started = filter_major_requirements(TEST_DB_PATH, major, [])
+        self.assertEqual(len(completed_reqs), 0)
+        self.assertEqual(len(in_progress), 0)
+        self.assertIn('I&CSCI H32, 33', not_started)
+        self.assertIn('I&CSCI 31, 32, 33', not_started)
+        self.assertIn('Select I&CSCI 31-32-33 or I&CSCI H32-33', not_started)
+        self.assertIn('I&CSci 6B', not_started)
+        self.assertIn('I&CSci 6D', not_started)
+        self.assertIn('I&CSci 6N or Math 3A', not_started)
+        self.assertIn('In4matx 43', not_started)
+        self.assertIn('Math 2A', not_started)
+        self.assertIn('Math 2B', not_started)
+        self.assertIn('Stats 67', not_started)
+        self.assertIn('CompSci 161', not_started)
+        self.assertIn('I&CSci 45C', not_started)
+        self.assertIn('I&CSci 46', not_started)
+        self.assertIn('I&CSci 51', not_started)
+        self.assertIn('I&CSci 53', not_started)
+        self.assertIn('2 Project Courses', not_started)
+        self.assertIn('11 Upper-Div Electives', not_started)
+        self.assertIn('2 GE II courses (except ECON, MATH, School of Engineering or School of ICS courses)', not_started)
 
     def test_unit_requirements(self):
         major = "BS-277"
@@ -146,6 +171,35 @@ class TestSQLIndex(unittest.TestCase):
         completed_reqs, in_progress, not_started = filter_major_requirements(TEST_DB_PATH, major, [])
         self.assertEqual(len(completed_reqs), 0)
         self.assertEqual(len(in_progress), 0)
+        
+
+    def test_minor_requirements(self):
+        minor = "459"
+        completed = ["I&CSCIH32", "I&CSCI33", "I&CSCI6B",
+                     "I&CSCI6D", "I&CSCI45C", "I&CSCI46", 
+                     "I&CSCI51", "COMPSCI161"]
+        completed_reqs, in_progress, not_started = filter_minor_requirements(TEST_DB_PATH, minor, completed)
+        self.assertIn('I&CSCI 31+32 or I&CSCI H32', completed_reqs)
+        # self.assertIn('I&CSCI 31+32', completed_reqs)
+        self.assertIn('I&C Sci H32', completed_reqs)
+        self.assertIn('I&C Sci 6D', completed_reqs)
+        self.assertIn('I&C Sci 45C', completed_reqs)
+        self.assertIn('I&C Sci 46', completed_reqs)
+        self.assertIn('I&C Sci 51 or IN4MATX 43', completed_reqs)
+        self.assertIn('2 upper-div courses from list', in_progress)
+
+    def test_specialization_requirements(self):
+        specialization = "BS-294D"
+        completed = ["ENGRCEE164", "CBE176"]
+        completed_reqs, in_progress, not_started = filter_specialization_requirements(TEST_DB_PATH, specialization, completed)
+        # print(completed_reqs)
+        # print(in_progress)
+        # print(not_started)
+        self.assertIn("One course (4 units) from CBE 176, 199, or MSE 141", completed_reqs)
+        self.assertIn("7 units from Energy and the Environment Specialization courses", in_progress)
+        self.assertIn("Minimum 11 units from Energy and the Environment Specializaion courses", in_progress)
+        self.assertIn("Additional Technical Electives", not_started)
+        
 
 class TestCourseSearch(unittest.TestCase):
     def test_course_search_major_requirements(self):
@@ -165,7 +219,7 @@ class TestCourseSearch(unittest.TestCase):
         res = course_search.get_major_requirement_completion()
         completed_reqs, in_progress, not_started = res[majors[0]]
         self.assertIn('I&CSCI H32, 33', completed_reqs)
-        self.assertIn('I&CSCI 31, 32, 33', completed_reqs)
+        self.assertIn('I&CSCI 31, 32, 33', in_progress)
         self.assertIn('I&CSci 6B', completed_reqs)
         self.assertIn('I&CSci 6D', completed_reqs)
         self.assertIn('I&CSci 6N or Math 3A', completed_reqs)
@@ -201,6 +255,5 @@ if __name__ == "__main__":
         majors_file.close()
         minors_file.close()
         specializations_file.close()
-
             
     unittest.main()
