@@ -1,8 +1,8 @@
 import sqlite3
 import json
 from collections import defaultdict
-from Index.index_search import *
-from Index.common import *
+from index.index_search import *
+from index.common import *
 import data_collection
 
 

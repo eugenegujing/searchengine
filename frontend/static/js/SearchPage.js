@@ -19,170 +19,9 @@ const profile = JSON.parse(localStorage.getItem('peterProfile') || 'null');
   if (qSel && profile.quarterTarget) qSel.value = profile.quarterTarget;
 })();
 
-/* ---------- Demo course data (replace with AJAX) ---------- */
+/* ---------- Backend API base URL ---------- */
 
-const DEMO_COURSES = [
-  {
-    id: 'ICS31',
-    code: 'I&C SCI 31',
-    title: 'Introduction to Programming',
-    dept: 'I&C SCI',
-    level: 'lower',
-    units: 4,
-    instructor: 'Kay, R.',
-    time: 'MWF 10:00-10:50am',
-    location: 'SSH 100',
-    format: 'in-person',
-    ge: [],
-    tags: ['major'],
-    matchScore: 95,
-    explanation: 'Required for your ICS/CS major. No prerequisites — a great starting point.'
-  },
-  {
-    id: 'ICS32',
-    code: 'I&C SCI 32',
-    title: 'Programming with Software Libraries',
-    dept: 'I&C SCI',
-    level: 'lower',
-    units: 4,
-    instructor: 'Thornton, A.',
-    time: 'TuTh 2:00-3:20pm',
-    location: 'ALP 1300',
-    format: 'in-person',
-    ge: [],
-    tags: ['major', 'prereq'],
-    matchScore: 90,
-    explanation: 'Builds on ICS 31. Prerequisite: ICS 31 with grade C or better.'
-  },
-  {
-    id: 'WRITING40',
-    code: 'WRITING 40',
-    title: 'Intro to Writing & Rhetoric',
-    dept: 'WRITING',
-    level: 'lower',
-    units: 4,
-    instructor: 'Garcia, M.',
-    time: 'MWF 11:00-11:50am',
-    location: 'HH 112',
-    format: 'in-person',
-    ge: ['Ia'],
-    tags: ['ge'],
-    matchScore: 82,
-    explanation: 'Satisfies GE Ia (Lower Division Writing). Moderate workload with weekly essays.'
-  },
-  {
-    id: 'MATH2A',
-    code: 'MATH 2A',
-    title: 'Single-Variable Calculus I',
-    dept: 'MATH',
-    level: 'lower',
-    units: 4,
-    instructor: 'Chen, L.',
-    time: 'MWF 9:00-9:50am',
-    location: 'MSTB 120',
-    format: 'in-person',
-    ge: ['Va'],
-    tags: ['major', 'ge'],
-    matchScore: 88,
-    explanation: 'Satisfies GE Va and is required for most STEM majors. Morning section.'
-  },
-  {
-    id: 'ANTHRO2A',
-    code: 'ANTHRO 2A',
-    title: 'Intro to Sociocultural Anthropology',
-    dept: 'ANTHRO',
-    level: 'lower',
-    units: 4,
-    instructor: 'Dominguez, V.',
-    time: 'TuTh 11:00-12:20pm',
-    location: 'SSL 228',
-    format: 'in-person',
-    ge: ['III', 'VII'],
-    tags: ['ge'],
-    matchScore: 75,
-    explanation: 'Satisfies GE III and GE VII. No prerequisites, lighter workload.'
-  },
-  {
-    id: 'COMPSCI161',
-    code: 'COMPSCI 161',
-    title: 'Design and Analysis of Algorithms',
-    dept: 'COMPSCI',
-    level: 'upper',
-    units: 4,
-    instructor: 'Goodrich, M.',
-    time: 'TuTh 3:30-4:50pm',
-    location: 'DBH 1500',
-    format: 'in-person',
-    ge: [],
-    tags: ['major'],
-    matchScore: 92,
-    explanation: 'Core upper-division CS course. Prerequisites: ICS 46, MATH 2B, ICS 6D.'
-  },
-  {
-    id: 'ARTVIS20',
-    code: 'ART VIS 20',
-    title: 'Foundations in Digital Art',
-    dept: 'ART',
-    level: 'lower',
-    units: 4,
-    instructor: 'Park, S.',
-    time: 'MW 2:00-4:50pm',
-    location: 'CAC 2015',
-    format: 'in-person',
-    ge: ['IV'],
-    tags: ['ge'],
-    matchScore: 68,
-    explanation: 'Satisfies GE IV (Arts & Humanities). Fun elective, no prerequisites.'
-  },
-  {
-    id: 'PSYCH9A',
-    code: 'PSYCH 9A',
-    title: 'Psychology Fundamentals',
-    dept: 'PSYCH',
-    level: 'lower',
-    units: 4,
-    instructor: 'Hagedorn, J.',
-    time: 'MWF 1:00-1:50pm',
-    location: 'PCB 1100',
-    format: 'in-person',
-    ge: ['III'],
-    tags: ['ge'],
-    matchScore: 72,
-    explanation: 'Satisfies GE III. Large lecture format, manageable workload.'
-  },
-  {
-    id: 'IN4MATX43',
-    code: 'IN4MATX 43',
-    title: 'Introduction to Software Engineering',
-    dept: 'IN4MATX',
-    level: 'lower',
-    units: 4,
-    instructor: 'Ziv, H.',
-    time: 'TuTh 9:30-10:50am',
-    location: 'ICS 174',
-    format: 'in-person',
-    ge: [],
-    tags: ['major'],
-    matchScore: 85,
-    explanation: 'Recommended for ICS/SE majors. Covers SDLC, teamwork, testing.'
-  },
-  {
-    id: 'PHYSICS7C',
-    code: 'PHYSICS 7C',
-    title: 'Classical Physics',
-    dept: 'PHYSICS',
-    level: 'lower',
-    units: 4,
-    instructor: 'Feng, W.',
-    time: 'MWF 8:00-8:50am',
-    location: 'RH 104',
-    format: 'in-person',
-    ge: ['II'],
-    tags: ['ge', 'warning'],
-    matchScore: 60,
-    explanation: 'Satisfies GE II. Warning: early morning section with heavy workload.'
-  }
-];
+const API_BASE = window.location.origin;
 
 /* ---------- Render functions ---------- */
 
@@ -234,78 +73,32 @@ function renderResults(courses) {
   list.innerHTML = courses.map(renderCourseCard).join('');
 }
 
-/* ---------- Search via AJAX (stub) ---------- */
+/* ---------- Search via backend API ---------- */
 
-/**
- * Replace this function body with a real fetch() call to your backend.
- *
- * Example:
- *
- *   async function searchCourses(query, filters) {
- *     const spinner = document.getElementById('loadingSpinner');
- *     spinner.classList.add('show');
- *
- *     const params = new URLSearchParams({
- *       q:        query,
- *       quarter:  filters.quarter,
- *       dept:     filters.dept,
- *       level:    filters.level,
- *       ge:       filters.ge,
- *       time:     filters.time,
- *       format:   filters.format,
- *       maxUnits: filters.maxUnits
- *     });
- *
- *     // Include the user profile so the backend can personalize ranking
- *     const res = await fetch(`/api/search?${params}`, {
- *       method: 'POST',
- *       headers: { 'Content-Type': 'application/json' },
- *       body: JSON.stringify({ profile })
- *     });
- *     const data = await res.json();
- *
- *     spinner.classList.remove('show');
- *     renderResults(data.courses);
- *   }
- */
-
-function searchCourses(query, filters) {
+async function searchCourses(query, filters) {
   const spinner = document.getElementById('loadingSpinner');
   spinner.classList.add('show');
 
-  // Simulate AJAX delay
-  setTimeout(() => {
-    let results = [...DEMO_COURSES];
+  const params = new URLSearchParams();
+  if (query)           params.set('q', query);
+  if (filters.quarter) params.set('quarter', filters.quarter);
+  if (filters.dept)    params.set('dept', filters.dept);
+  if (filters.level)   params.set('level', filters.level);
+  if (filters.ge)      params.set('ge', filters.ge);
+  if (filters.maxUnits && filters.maxUnits < 8)
+    params.set('maxUnits', filters.maxUnits);
+  params.set('sortBy', document.getElementById('sortBy').value);
 
-    // Client-side filtering (demo only — real filtering happens on the server)
-    if (query) {
-      const q = query.toLowerCase();
-      results = results.filter(c =>
-        c.title.toLowerCase().includes(q) ||
-        c.code.toLowerCase().includes(q) ||
-        c.dept.toLowerCase().includes(q) ||
-        c.explanation.toLowerCase().includes(q) ||
-        c.ge.some(g => g.toLowerCase().includes(q))
-      );
-    }
-    if (filters.dept)     results = results.filter(c => c.dept === filters.dept);
-    if (filters.level)    results = results.filter(c => c.level === filters.level);
-    if (filters.ge)       results = results.filter(c => c.ge.includes(filters.ge));
-    if (filters.format && filters.format !== '')
-      results = results.filter(c => c.format === filters.format);
-    if (filters.maxUnits && filters.maxUnits < 8)
-      results = results.filter(c => c.units <= filters.maxUnits);
-
-    // Sort
-    const sortBy = document.getElementById('sortBy').value;
-    if (sortBy === 'match')      results.sort((a, b) => b.matchScore - a.matchScore);
-    if (sortBy === 'units-asc')  results.sort((a, b) => a.units - b.units);
-    if (sortBy === 'units-desc') results.sort((a, b) => b.units - a.units);
-    if (sortBy === 'dept')       results.sort((a, b) => a.dept.localeCompare(b.dept));
-
+  try {
+    const res = await fetch(`${API_BASE}/api/search?${params.toString()}`);
+    const data = await res.json();
     spinner.classList.remove('show');
-    renderResults(results);
-  }, 400);
+    renderResults(data.courses || []);
+  } catch (err) {
+    console.error('Search API error:', err);
+    spinner.classList.remove('show');
+    renderResults([]);
+  }
 }
 
 /* ---------- Gather current filter values ---------- */

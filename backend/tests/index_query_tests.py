@@ -2,11 +2,11 @@ import unittest
 
 import sqlite3
 import sys
-import Index.sql_index as sql_index
+import index.sql_index as sql_index
 import data_collection
 from pathlib import Path
 from Tests.helpers import *
-from Index.index_search import *
+from index.index_search import *
 import json
 
 TEST_DB_PATH = "Tests/test.db"

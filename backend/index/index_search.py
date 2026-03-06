@@ -1,6 +1,6 @@
 import sqlite3
 from collections import defaultdict
-from Index.common import *
+from index.common import *
 
 #===================================================================================
 
@@ -218,7 +218,7 @@ def filter_course_term(year: int, quarter: str, db_path):
     quarter = quarter.lower()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    assert((quarter in QUARTERS.keys()) or (quarter is None), "Invalid quarter argument")
+    assert (quarter in QUARTERS.keys()) or (quarter is None), "Invalid quarter argument"
     if (quarter is not None):
         quarter = QUARTERS[quarter]
     if (year and quarter):

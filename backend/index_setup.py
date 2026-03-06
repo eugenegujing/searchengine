@@ -2,8 +2,7 @@ import sqlite3
 import json
 from pathlib import Path
 
-import Index.sql_index as sql_index
-from Index.index_search import *
+import index.sql_index as sql_index
 import data_collection
 
 """
@@ -34,15 +33,18 @@ def setup_index(n_terms):
     sql_index.create_index(DB_PATH, all_course_data, all_major_data, 
                  all_minor_data, all_spec_data, n_terms)
     
-def retrieve_api_course_data():
+def retrieve_api_course_data(force=False):
     data_jsons = [
-
-        Path("all_course_data.json"), 
-        Path("all_major_data.json"), 
-        Path("all_minor_data.json"), 
+        Path("all_course_data.json"),
+        Path("all_major_data.json"),
+        Path("all_minor_data.json"),
         Path("all_specialization_data.json")
-
     ]
+
+    if not force and all(f.exists() for f in data_jsons):
+        print("JSON data files already exist, skipping download. Use --force to re-download.")
+        return
+
     for file in data_jsons:
         file.unlink(missing_ok=True)
     data_collection.fetch_courses()
@@ -52,14 +54,10 @@ def retrieve_api_course_data():
 
 
 if __name__ == "__main__":
+    import sys
+    force = "--force" in sys.argv
 
-    
-    #########################################################
-    # Comment out the lines below if you have already collected the api data
-    #
-    retrieve_api_course_data()
-    #
-    #########################################################
+    retrieve_api_course_data(force=force)
 
     # Loads the n most recent terms from the API
     n_terms = 10
