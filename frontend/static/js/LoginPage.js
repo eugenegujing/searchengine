@@ -28,8 +28,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (data.status === "success") {
         alert("Login successful!");
-        window.location.href = "UserProfilePage.html"; // ← Redirect to user profile
-      } else {
+
+        // store who logged in
+        localStorage.setItem("loggedInUser", username);
+
+        if (data.profile_completed) {
+            // fetch saved profile from backend
+            fetch(`/api/profile?username=${username}`)
+            .then(res => res.json())
+            .then(profileData => {
+                localStorage.setItem('peterProfile', JSON.stringify(profileData));
+                window.location.href = "SearchPage.html";
+                });
+        } 
+        else {
+            window.location.href = "UserProfilePage.html";
+        }
+      } 
+      else {
         alert(data.error || "Invalid username or password.");
       }
 

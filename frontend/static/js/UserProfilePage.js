@@ -72,22 +72,23 @@ function gatherProfile() {
 
 function submitProfile() {
   const profile = gatherProfile();
-
-  localStorage.setItem('peterProfile', JSON.stringify(profile));
+  const username = localStorage.getItem("loggedInUser");
 
   fetch('/api/profile', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify(profile)
+    body: JSON.stringify({
+      username: username,
+      profile: profile
+    })
   })
   .then(res => res.json())
   .then(data => {
-    console.log('Profile saved to database:', data);
+    console.log('Profile saved:', data);
     window.location.href = 'SearchPage.html';
-  })
-  .catch(err => console.error('Error saving profile:', err));
+  });
 }
 
 // function submitProfile() {

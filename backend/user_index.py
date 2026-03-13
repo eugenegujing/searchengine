@@ -1,7 +1,7 @@
 import sqlite3
-import json
+import os
 
-DB_PATH = "courses.db"
+DB_PATH = os.path.join(os.path.dirname(__file__), "courses.db")
 
 conn = sqlite3.connect(DB_PATH)
 cursor = conn.cursor()

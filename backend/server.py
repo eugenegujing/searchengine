@@ -278,14 +278,14 @@ def api_register():
     cur = conn.cursor()
 
     # Check if username exists
-    existing = cur.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    existing = cur.execute("SELECT id FROM Users WHERE username = ?", (username,)).fetchone()
     if existing:
         conn.close()
         return jsonify({"error": "Username already exists"}), 400
 
     # insert user
     cur.execute("""
-        INSERT INTO users (username, password, display_name)
+        INSERT INTO Users (username, password, display_name)
         VALUES (?, ?, ?)
     """, (username, password, display_name))
     conn.commit()
@@ -297,85 +297,270 @@ def api_register():
 # ─────────────── API: Login ───────────────
 
 @app.route("/api/login", methods=["POST"])
-def api_login():
+def login():
     data = request.get_json()
-    username = data.get("username", "").strip()
-    password = data.get("password", "")
-
-    if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
+    username = data["username"]
+    password = data["password"]
 
     conn = get_db()
     cur = conn.cursor()
-    user = cur.execute("SELECT id, password, display_name FROM users WHERE username = ?", (username,)).fetchone()
+
+    cur.execute("""
+        SELECT id, standing, display_name
+        FROM Users
+        WHERE username=? AND password=?
+    """, (username, password))
+
+    row = cur.fetchone()
     conn.close()
 
-    if not user:
-        return jsonify({"error": "Invalid username or password"}), 401
+    if not row:
+        return jsonify({"status": "error", "error": "Invalid credentials"})
 
-    return jsonify({"status": "success", "user_id": user["id"], "displayName": user["display_name"]})
+    profile_completed = bool(row["standing"])  # True if standing is not NULL / empty
 
-# ─────────────── API: Save User Profile ───────────────
+    return jsonify({
+        "status": "success",
+        "profile_completed": profile_completed,
+        "displayName": row["display_name"]
+    })
 
-@app.route("/api/profile", methods=["POST"], strict_slashes=False)
-def api_save_profile():
-    profile = request.get_json()
+# ─────────────── API: Save/Update User Profile ───────────────
+
+@app.route("/api/profile", methods=["POST"])
+def api_save_profile_partial():
+    data = request.get_json()
+    username = data.get("username")
+    new_profile = data.get("profile", {})
+
+    if not username or not new_profile:
+        return jsonify({"error": "Missing username or profile"}), 400
 
     conn = get_db()
     cur = conn.cursor()
 
-    # Insert main user profile
+    # Get existing user
+    cur.execute("SELECT * FROM Users WHERE username = ?", (username,))
+    user = cur.fetchone()
+
+    if not user:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+
+    user_id = user["id"]
+
+    # Merge old values with new values
+    merged = {
+        "display_name": new_profile.get("displayName") or user["display_name"],
+        "standing": new_profile.get("standing") or user["standing"],
+        "college": new_profile.get("college") or user["college"],
+        "major": new_profile.get("major") or user["major"],
+        "minor": new_profile.get("minor") or user["minor"],
+        "priority": new_profile.get("priority") or user["priority"],
+        "preferred_time": new_profile.get("preferredTime") or user["preferred_time"],
+        "workload": new_profile.get("workload") or user["workload"],
+        "course_format": new_profile.get("courseFormat") or user["course_format"],
+        "commuter": new_profile.get("commuter") or user["commuter"],
+        "quarter_target": new_profile.get("quarterTarget") or user["quarter_target"],
+        "max_units": new_profile.get("maxUnits") or user["max_units"]
+    }
+
+    # Update user with merged values
     cur.execute("""
-        INSERT INTO users (
-            display_name,
-            standing,
-            college,
-            major,
-            minor,
-            priority,
-            preferred_time,
-            workload,
-            course_format,
-            commuter,
-            quarter_target,
-            max_units
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        UPDATE Users
+        SET display_name=?, standing=?, college=?, major=?, minor=?,
+            priority=?, preferred_time=?, workload=?, course_format=?,
+            commuter=?, quarter_target=?, max_units=?
+        WHERE id=?
     """, (
-        profile.get("displayName"),
-        profile.get("standing"),
-        profile.get("college"),
-        profile.get("major"),
-        profile.get("minor"),
-        profile.get("priority"),
-        profile.get("preferredTime"),
-        profile.get("workload"),
-        profile.get("courseFormat"),
-        profile.get("commuter"),
-        profile.get("quarterTarget"),
-        profile.get("maxUnits")
+        merged["display_name"], merged["standing"], merged["college"],
+        merged["major"], merged["minor"], merged["priority"], merged["preferred_time"],
+        merged["workload"], merged["course_format"], merged["commuter"],
+        merged["quarter_target"], merged["max_units"], user_id
     ))
 
-    user_id = cur.lastrowid
+    # Optional: update GE needs / completed courses only if provided
+    if "geNeeded" in new_profile:
+        cur.execute("DELETE FROM UserGeNeeds WHERE user_id=?", (user_id,))
+        for ge in new_profile["geNeeded"]:
+            cur.execute("INSERT INTO UserGeNeeds (user_id, ge_category) VALUES (?, ?)", (user_id, ge))
 
-    # Insert GE needs
-    for ge in profile.get("geNeeded", []):
-        cur.execute(
-            "INSERT INTO UserGeNeeds (user_id, ge_category) VALUES (?, ?)",
-            (user_id, ge)
-        )
-
-    # Insert completed courses
-    for course in profile.get("completedCourses", []):
-        cur.execute(
-            "INSERT INTO UserCompletedCourses (user_id, course_code) VALUES (?, ?)",
-            (user_id, course)
-        )
+    if "completedCourses" in new_profile:
+        cur.execute("DELETE FROM UserCompletedCourses WHERE user_id=?", (user_id,))
+        for course in new_profile["completedCourses"]:
+            cur.execute("INSERT INTO UserCompletedCourses (user_id, course_code) VALUES (?, ?)", (user_id, course))
 
     conn.commit()
     conn.close()
 
     return jsonify({"status": "saved", "user_id": user_id})
+
+# @app.route("/api/profile", methods=["POST"], strict_slashes=False)
+# def api_save_profile():
+#     data = request.get_json()
+#     username = data.get("username")
+#     profile = data.get("profile")
+
+#     conn = get_db()
+#     cur = conn.cursor()
+
+#     # check if user already exists
+#     cur.execute("SELECT id FROM Users WHERE username = ?", (username,))
+#     row = cur.fetchone()
+
+#     if row:
+#         user_id = row["id"]
+
+#         # UPDATE existing profile
+#         cur.execute("""
+#             UPDATE Users
+#             SET display_name=?,
+#                 standing=?,
+#                 college=?,
+#                 major=?,
+#                 minor=?,
+#                 priority=?,
+#                 preferred_time=?,
+#                 workload=?,
+#                 course_format=?,
+#                 commuter=?,
+#                 quarter_target=?,
+#                 max_units=?
+#             WHERE id=?
+#         """, (
+#             profile.get("displayName"),
+#             profile.get("standing"),
+#             profile.get("college"),
+#             profile.get("major"),
+#             profile.get("minor"),
+#             profile.get("priority"),
+#             profile.get("preferredTime"),
+#             profile.get("workload"),
+#             profile.get("courseFormat"),
+#             profile.get("commuter"),
+#             profile.get("quarterTarget"),
+#             profile.get("maxUnits"),
+#             user_id
+#         ))
+
+#         # clear old GE + courses
+#         cur.execute("DELETE FROM UserGeNeeds WHERE user_id=?", (user_id,))
+#         cur.execute("DELETE FROM UserCompletedCourses WHERE user_id=?", (user_id,))
+
+#     else:
+#         # INSERT new user
+#         cur.execute("""
+#             INSERT INTO Users (
+#                 username,
+#                 display_name,
+#                 standing,
+#                 college,
+#                 major,
+#                 minor,
+#                 priority,
+#                 preferred_time,
+#                 workload,
+#                 course_format,
+#                 commuter,
+#                 quarter_target,
+#                 max_units
+#             )
+#             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+#         """, (
+#             username,
+#             profile.get("displayName"),
+#             profile.get("standing"),
+#             profile.get("college"),
+#             profile.get("major"),
+#             profile.get("minor"),
+#             profile.get("priority"),
+#             profile.get("preferredTime"),
+#             profile.get("workload"),
+#             profile.get("courseFormat"),
+#             profile.get("commuter"),
+#             profile.get("quarterTarget"),
+#             profile.get("maxUnits")
+#         ))
+
+#         user_id = cur.lastrowid
+
+#     # Insert GE needs
+#     for ge in profile.get("geNeeded", []):
+#         cur.execute(
+#             "INSERT INTO UserGeNeeds (user_id, ge_category) VALUES (?, ?)",
+#             (user_id, ge)
+#         )
+
+#     # Insert completed courses
+#     for course in profile.get("completedCourses", []):
+#         cur.execute(
+#             "INSERT INTO UserCompletedCourses (user_id, course_code) VALUES (?, ?)",
+#             (user_id, course)
+#         )
+
+#     conn.commit()
+#     conn.close()
+
+#     return jsonify({"status": "saved", "user_id": user_id})
+
+# ─────────────── API: Get User Profile ───────────────
+
+@app.route("/api/profile", methods=["GET"])
+def api_get_profile():
+    username = request.args.get("username")
+    if not username:
+        return jsonify({"error": "Missing username"}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Fetch main user info
+    cur.execute("""
+        SELECT id, display_name, standing, college, major, minor,
+               priority, preferred_time, workload, course_format,
+               commuter, quarter_target, max_units
+        FROM Users
+        WHERE username = ?
+    """, (username,))
+    user = cur.fetchone()
+
+    if not user:
+        conn.close()
+        return jsonify({"error": "Profile not found"}), 404
+
+    user_id = user["id"]
+
+    # Fetch GE needs
+    cur.execute("SELECT ge_category FROM UserGeNeeds WHERE user_id = ?", (user_id,))
+    ge_rows = cur.fetchall()
+    ge_needed = [r["ge_category"] for r in ge_rows]
+
+    # Fetch completed courses
+    cur.execute("SELECT course_code FROM UserCompletedCourses WHERE user_id = ?", (user_id,))
+    course_rows = cur.fetchall()
+    completed_courses = [r["course_code"] for r in course_rows]
+
+    conn.close()
+
+    profile = {
+        "username": username,
+        "displayName": user["display_name"],
+        "standing": user["standing"],
+        "college": user["college"],
+        "major": user["major"],
+        "minor": user["minor"],
+        "priority": user["priority"],
+        "preferredTime": user["preferred_time"],
+        "workload": user["workload"],
+        "courseFormat": user["course_format"],
+        "commuter": user["commuter"],
+        "quarterTarget": user["quarter_target"],
+        "maxUnits": user["max_units"],
+        "geNeeded": ge_needed,
+        "completedCourses": completed_courses
+    }
+
+    return jsonify(profile)
 
 # ─────────────── Helpers ───────────────
 
