@@ -4,6 +4,7 @@ import sqlite3
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+from ranking import compute_match_score
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -44,7 +45,7 @@ def get_db():
 
 @app.route("/")
 def index():
-    return send_from_directory(FRONTEND_DIR, "UserProfilePage.html")
+    return send_from_directory(FRONTEND_DIR, "LoginPage.html")
 
 
 @app.route("/<path:filename>")
@@ -260,7 +261,121 @@ def api_majors():
     except Exception:
         conn.close()
         return jsonify([])
+    
+# ─────────────── API: Register ───────────────
 
+@app.route("/api/register", methods=["POST"])
+def api_register():
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+    display_name = data.get("displayName", "").strip()
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Check if username exists
+    existing = cur.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+    if existing:
+        conn.close()
+        return jsonify({"error": "Username already exists"}), 400
+
+    # insert user
+    cur.execute("""
+        INSERT INTO users (username, password, display_name)
+        VALUES (?, ?, ?)
+    """, (username, password, display_name))
+    conn.commit()
+    user_id = cur.lastrowid
+    conn.close()
+
+    return jsonify({"status": "registered", "user_id": user_id})
+
+# ─────────────── API: Login ───────────────
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    data = request.get_json()
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
+
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+
+    conn = get_db()
+    cur = conn.cursor()
+    user = cur.execute("SELECT id, password, display_name FROM users WHERE username = ?", (username,)).fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"error": "Invalid username or password"}), 401
+
+    return jsonify({"status": "success", "user_id": user["id"], "displayName": user["display_name"]})
+
+# ─────────────── API: Save User Profile ───────────────
+
+@app.route("/api/profile", methods=["POST"], strict_slashes=False)
+def api_save_profile():
+    profile = request.get_json()
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    # Insert main user profile
+    cur.execute("""
+        INSERT INTO users (
+            display_name,
+            standing,
+            college,
+            major,
+            minor,
+            priority,
+            preferred_time,
+            workload,
+            course_format,
+            commuter,
+            quarter_target,
+            max_units
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        profile.get("displayName"),
+        profile.get("standing"),
+        profile.get("college"),
+        profile.get("major"),
+        profile.get("minor"),
+        profile.get("priority"),
+        profile.get("preferredTime"),
+        profile.get("workload"),
+        profile.get("courseFormat"),
+        profile.get("commuter"),
+        profile.get("quarterTarget"),
+        profile.get("maxUnits")
+    ))
+
+    user_id = cur.lastrowid
+
+    # Insert GE needs
+    for ge in profile.get("geNeeded", []):
+        cur.execute(
+            "INSERT INTO UserGeNeeds (user_id, ge_category) VALUES (?, ?)",
+            (user_id, ge)
+        )
+
+    # Insert completed courses
+    for course in profile.get("completedCourses", []):
+        cur.execute(
+            "INSERT INTO UserCompletedCourses (user_id, course_code) VALUES (?, ?)",
+            (user_id, course)
+        )
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"status": "saved", "user_id": user_id})
 
 # ─────────────── Helpers ───────────────
 
