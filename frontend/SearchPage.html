@@ -17,10 +17,43 @@
     <div class="nav-links">
       <a href="UserProfilePage.html">Profile</a>
       <a href="SearchPage.html" class="active">Search</a>
-      <div class="profile-badge" id="profileBadge" style="display:none;">
-        <span class="avatar" id="avatarInitial">?</span>
-        <span id="profileName">Student</span>
+      <div class="profile-badge" id="profileBadge" style="display:none; position: relative; cursor: pointer;">
+      <span class="avatar" id="avatarInitial">?</span>
+      <span id="profileName">Student</span>
+      <!-- Dropdown -->
+      <div class="profile-dropdown" id="profileDropdown" style="
+          display: none;
+          flex-direction: column;
+          position: absolute;
+          top: 120%;
+          right: 0;
+          background: var(--card-bg);
+          border: 1.5px solid var(--border);
+          border-radius: var(--radius);
+          box-shadow: var(--shadow);
+          padding: 0.5rem 0;
+          min-width: 160px;
+          z-index: 10;
+        ">
+        <a href="UserProfilePage.html" style="
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            color: var(--text);
+            transition: background var(--transition);
+          ">View Profile</a>
+        <button id="logoutBtn" style="
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            color: var(--text);
+            background: none;
+            border: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            transition: background var(--transition);
+          ">Logout</button>
       </div>
+    </div>
     </div>
   </nav>
 

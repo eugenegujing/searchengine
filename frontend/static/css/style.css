@@ -723,6 +723,34 @@ a {
   color: rgba(255, 255, 255, 0.9);
 }
 
+.profile-dropdown {
+  display: none; /* hide by default */
+  position: absolute;
+  top: 100%;
+  right: 0;
+  background-color: white;
+  border: 1px solid #ccc;
+  min-width: 150px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  flex-direction: column;
+  z-index: 100;
+}
+
+.profile-dropdown a,
+.profile-dropdown button {
+  padding: 10px;
+  text-align: left;
+  border: none;
+  background: none;
+  width: 100%;
+  cursor: pointer;
+}
+
+.profile-dropdown a:hover,
+.profile-dropdown button:hover {
+  background-color: #f0f0f0;
+}
+
 .profile-badge .avatar {
   width: 26px;
   height: 26px;

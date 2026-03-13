@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - PeterTheCourseAdvisor</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+<!-- Top Navigation -->
+<nav class="topnav">
+    <div class="brand">
+        <span class="icon">P</span>
+        PeterTheCourseAdvisor
+    </div>
+ </nav>
+
+  <div class="onboarding-wrapper">
+    <div class="onboarding-card">
+
+      <!-- Header -->
+      <div class="onboarding-header">
+        <h1>Create Your Account</h1>
+        <p>Sign up to start exploring courses and personalized recommendations.</p>
+      </div>
+
+      <!-- Form Body -->
+      <div class="form-body">
+        <form id="registerForm">
+
+          <div class="field">
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter your username" required>
+          </div>
+
+          <div class="field">
+            <label for="password">Password</label>
+            <input type="text" id="password" placeholder="Enter your password" required>
+          </div>
+
+          <div class="field">
+            <label for="confirmPassword">Confirm Password</label>
+            <input type="text" id="confirmPassword" placeholder="Confirm your password" required>
+          </div>
+
+          <div class="btn-row">
+            <button type="submit" class="btn btn-primary">Register</button>
+          </div>
+
+        </form>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', e => {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+
+      if(password !== confirmPassword) {
+        alert("Passwords do not match!");
+        return;
+      }
+
+      fetch('/api/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username, password})
+      })
+      .then(res => res.json())
+      .then(data => {
+        if(data.status === "registered"){
+          alert('Registration successful!');
+          window.location.href = 'LoginPage.html';
+        } else {
+          alert(data.error || 'Registration failed');
+        }
+      });
+    });
+  </script>
+
+</body>
+</html>

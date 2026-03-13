@@ -73,32 +73,52 @@ function gatherProfile() {
 function submitProfile() {
   const profile = gatherProfile();
 
-  // Persist to localStorage so the search page can read it
   localStorage.setItem('peterProfile', JSON.stringify(profile));
 
-  /*
-   * ============================================================
-   * AJAX hook — replace the URL below with your real API endpoint
-   * once the backend is ready. The profile object is sent as JSON.
-   * ============================================================
-   *
-   * Example with fetch():
-   *
-   * fetch('/api/profile', {
-   *   method: 'POST',
-   *   headers: { 'Content-Type': 'application/json' },
-   *   body: JSON.stringify(profile)
-   * })
-   * .then(res => res.json())
-   * .then(data => {
-   *   console.log('Profile saved on server:', data);
-   *   window.location.href = 'SearchPage.html';
-   * })
-   * .catch(err => console.error('Failed to save profile:', err));
-   *
-   * For now we just redirect immediately:
-   */
-
-  console.log('Profile saved to localStorage:', profile);
-  window.location.href = 'SearchPage.html';
+  fetch('/api/profile', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(profile)
+  })
+  .then(res => res.json())
+  .then(data => {
+    console.log('Profile saved to database:', data);
+    window.location.href = 'SearchPage.html';
+  })
+  .catch(err => console.error('Error saving profile:', err));
 }
+
+// function submitProfile() {
+//   const profile = gatherProfile();
+
+//   // Persist to localStorage so the search page can read it
+//   localStorage.setItem('peterProfile', JSON.stringify(profile));
+
+//   /*
+//    * ============================================================
+//    * AJAX hook — replace the URL below with your real API endpoint
+//    * once the backend is ready. The profile object is sent as JSON.
+//    * ============================================================
+//    *
+//    * Example with fetch():
+//    *
+//    * fetch('/api/profile', {
+//    *   method: 'POST',
+//    *   headers: { 'Content-Type': 'application/json' },
+//    *   body: JSON.stringify(profile)
+//    * })
+//    * .then(res => res.json())
+//    * .then(data => {
+//    *   console.log('Profile saved on server:', data);
+//    *   window.location.href = 'SearchPage.html';
+//    * })
+//    * .catch(err => console.error('Failed to save profile:', err));
+//    *
+//    * For now we just redirect immediately:
+//    */
+
+//   console.log('Profile saved to localStorage:', profile);
+//   window.location.href = 'SearchPage.html';
+// }

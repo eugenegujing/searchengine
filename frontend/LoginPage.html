@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeterTheCourseAdvisor - Login</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+
+<!-- Top Navigation -->
+<nav class="topnav">
+  <div class="brand">
+    <span class="icon">P</span>
+    PeterTheCourseAdvisor
+  </div>
+
+  <div class="nav-links">
+    <a href="LoginPage.html" class="active">Login</a>
+  </div>
+</nav>
+
+
+<!-- Login Card -->
+<div class="onboarding-wrapper">
+  <div class="onboarding-card">
+    <div class="onboarding-header">
+      <h1>Welcome Back</h1>
+      <p>Login to access your personalized course recommendations.</p>
+    </div>
+
+    <div class="form-body">
+
+      <div class="field">
+        <label>Username</label>
+        <input type="text" id="username" placeholder="Enter your username">
+      </div>
+
+      <div class="field">
+        <label>Password</label>
+        <input type="text" id="password" placeholder="Enter your password">
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="login()">Login</button>
+      </div>
+
+      <div style="margin-top:12px; font-size:0.85rem; color:var(--text-light);">
+        Don't have an account?
+        <a href="Register.html">Create one</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="static/js/LoginPage.js"></script>
+</body>
+</html>
