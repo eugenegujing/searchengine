@@ -5,11 +5,11 @@ import sys
 import index.sql_index as sql_index
 import data_collection
 from pathlib import Path
-from Tests.helpers import *
+from tests.helpers import *
 from index.index_search import *
 import json
 
-TEST_DB_PATH = "Tests/test.db"
+TEST_DB_PATH = "tests/test.db"
 CREATE_TEST_DB = True
 N_TERMS = 5
 
@@ -199,6 +199,40 @@ class TestSQLIndex(unittest.TestCase):
         self.assertIn("7 units from Energy and the Environment Specialization courses", in_progress)
         self.assertIn("Minimum 11 units from Energy and the Environment Specializaion courses", in_progress)
         self.assertIn("Additional Technical Electives", not_started)
+
+    def test_or_prerequisite_completion(self):
+        course_id = "I&CSCI33"
+        completed = []
+        self.assertFalse(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+        completed = ["I&CSCI31"]
+        self.assertFalse(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+        completed = ["I&CSCIH32"]
+        self.assertTrue(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+    def test_and_prerequisite_completion(self):
+        course_id = "COMPSCI122C"
+        completed = []
+        self.assertFalse(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+        completed = ["I&CSCI53"]
+        self.assertFalse(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+        completed = ["I&CSCI53", "COMPSCI122A"]
+        self.assertTrue(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+        completed = ["COMPSCI143A", "COMPSCI122A"]
+        self.assertTrue(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+    def test_more_complicated_prerequisites(self):
+        course_id = "COMPSCI117"
+        completed = ["I&CSCI6D", "MATH3A", "MATH2B",
+                     "CSE46"]
+        self.assertFalse(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+        completed.append("COMPSCI112")
+        self.assertTrue(check_prerequisites(course_id, completed, TEST_DB_PATH))
         
 
 class TestCourseSearch(unittest.TestCase):
@@ -345,6 +379,23 @@ class TestCourseSearch(unittest.TestCase):
         self.assertIn("CompSci 178", completed_reqs)
         self.assertIn("3 Add'l classes from list", completed_reqs)
 
+    def test_course_search_possible_courses_spring_2026(self):
+        majors = ["BS-201"]
+        course_search = CourseSearch(TEST_DB_PATH)
+        for major in majors:
+            course_search.add_major(major)
+        completed = ["I&CSCIH32", "I&CSCI33", "I&CSCI6B",
+                     "I&CSCI6D", "I&CSCI6N", "IN4MATX43",
+                     "I&CSCI45C", "I&CSCI46", "I&CSCI51",
+                     "I&CSCI53", "MATH2B", "STATS67",
+                     "MATH2A", "COMPSCI161"]
+        for course in completed:
+            course_search.add_prerequisite(course)
+
+        res = course_search.search(2026, "Spring")
+        self.assertIn("COMPSCI111", res)
+        self.assertNotIn("COMPSCI117", res)
+
 if __name__ == "__main__":
     if (CREATE_TEST_DB):
         courses_file =  open("all_course_data.json", "r")
@@ -355,9 +406,13 @@ if __name__ == "__main__":
         all_major_data = json.load(majors_file)
         all_minor_data = json.load(minors_file)
         all_spec_data = json.load(specializations_file)
+
+        db_path = Path(TEST_DB_PATH)
+        db_path.unlink(missing_ok=True)
         sql_index.create_index(TEST_DB_PATH, all_course_data, 
                                all_major_data, all_minor_data, 
                                all_spec_data, N_TERMS)
+        
         courses_file.close()
         majors_file.close()
         minors_file.close()

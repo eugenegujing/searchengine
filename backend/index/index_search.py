@@ -20,7 +20,7 @@ class CourseSearch():
         -majors: set containing major ids
         -minors: set containing minor ids
         -specializations: set containing specialization ids
-        -completed: set containing completed prerequisites
+        -completed: list containing completed prerequisites
 
     To create a query:
         -Initialize a CourseSearch object
@@ -94,11 +94,7 @@ class CourseSearch():
 
         results = set()
         for course in self.courses:
-            prereqs_completed = True
-            for prereq in get_prerequisites(course, self.db_path):
-                if (prereq[0] not in self.completed):
-                    prereqs_completed = False
-                    break
+            prereqs_completed = check_prerequisites(course, set(self.completed), self.db_path)
             if prereqs_completed:
                 results.add(course)
         return results
@@ -218,7 +214,7 @@ def filter_course_term(year: int, quarter: str, db_path):
     quarter = quarter.lower()
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    assert (quarter in QUARTERS.keys()) or (quarter is None), "Invalid quarter argument"
+    assert(quarter in QUARTERS.keys() or (quarter is None), "Invalid quarter argument")
     if (quarter is not None):
         quarter = QUARTERS[quarter]
     if (year and quarter):
@@ -632,7 +628,7 @@ def _process_unit_requirement(courses_completed, units_completed,
 
     if (parent):
         parent_requirements[parent].add(label)
-        
+
 
 def get_units_from_course_lists(course_list: list, cursor=None, db_path=None):
     if (cursor is None and db_path is None):
@@ -721,7 +717,81 @@ def get_course_data_from_term(course_id: str, year, quarter, db_path):
 def get_prerequisites(course_id: str, db_path: str):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    query = "SELECT prereq_id FROM Prerequisites WHERE course_id = ?"
+    query = "SELECT prereq_course_id FROM PrerequisiteCourses WHERE course_id = ?"
     results = cursor.execute(query, (course_id,)).fetchall()
     
     return results
+
+def check_prerequisites(course_id: str, completed_courses: list[str], db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    relationship_query = "SELECT id, prereq_type, parent FROM PrerequisiteRelationships WHERE course_id = ?"
+    prereq_course_query = "SELECT prereq_course_id FROM PrerequisiteCourses WHERE relationship_id = ?"
+
+    relationships = cursor.execute(relationship_query, (course_id,)).fetchall()
+    prereq_relationships = defaultdict(set)
+    prereq_courses = {}
+    prereq_types = {}
+    unprocessed_prereqs = []
+    processed_prereqs = set()
+    completed_prereqs = set()
+    for prereq_relationship in relationships:
+        relationship_id, relationship_type, parent = prereq_relationship
+        course_list = query_result_to_list(cursor.execute(prereq_course_query, (relationship_id,)).fetchall())
+        prereq_relationships[parent].add(relationship_id)
+        prereq_courses[relationship_id] = course_list
+        prereq_types[relationship_id] = relationship_type
+        unprocessed_prereqs.append(relationship_id)
+
+    while len(unprocessed_prereqs) > 0:
+        relationship_id = unprocessed_prereqs.pop(0)
+
+        # check if all children of this relationship are processed
+
+        try:
+            children = prereq_relationships[relationship_id]
+        except KeyError:
+            children = set()
+        
+        all_processed = True
+        for child in children:
+            if child not in processed_prereqs:
+                all_processed = False
+                break
+        
+        # push relationship back onto unprocessed, process next relationship
+        if (not all_processed):
+            unprocessed_prereqs.append(relationship_id)
+            continue
+        
+        relationship_courses = prereq_courses[relationship_id]
+        if len(children) > 0:
+            relationship_courses.extend(children)
+
+        
+        relationship_type = prereq_types[relationship_id]
+
+        if (relationship_type == "AND"):
+            relationship_completed = True
+            for course in relationship_courses:
+                if (course not in completed_courses) and (course not in completed_prereqs):
+                    relationship_completed = False
+                    break
+
+        elif (relationship_type == "OR"):
+            relationship_completed = False
+            for course in relationship_courses:
+                if (course in completed_courses) or (course in completed_prereqs):
+                    relationship_completed = True
+                    break
+
+        else:
+            raise CourseSearchException("Prerequisite relationship not found")
+                    
+                    
+        if (relationship_completed):
+            completed_prereqs.add(relationship_id)
+
+        processed_prereqs.add(relationship_id)
+
+    return len(processed_prereqs) == len(completed_prereqs)

@@ -28,7 +28,8 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
         Minors: General minor information
         MinorRequirements: Requirements needed to graduate with a given minor
         MinorCourses: Stores required courses for each minor as well as which requirements they fulfill
-        Prerequisites: Stores which courses have prerequisites
+        PrerequisiteRelationships: Stores AND/OR relationship tree for course prerequisites
+        PrerequisiteCourses: Stores which courses belong to which AND/OR in PrerequisiteRelationships
         Specializations: Specialization information
         SpecializationRequirements: Requirements for each specialization
         SpecializationCourses Stores required courses for each specialization as well as which requirements they fulfill
@@ -79,24 +80,22 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
             FOREIGN KEY (building_id) REFERENCES Buildings(building_id)
         );
                          
-        CREATE TABLE IF NOT EXISTS PrerequisitesOR (
+        CREATE TABLE IF NOT EXISTS PrerequisiteRelationships (
+            id INTEGER PRIMARY KEY,
+            prereq_type TEXT,
             course_id TEXT,
-            prereq_id TEXT,
-            parent TEXT,
-            PRIMARY KEY (course_id, prereq_id),
+            parent INTEGER,
             FOREIGN KEY (course_id) REFERENCES Courses(course_id),
-            FOREIGN KEY (prereq_id) REFERENCES Courses(course_id),
-            FOREIGN KEY (parent) REFERENCES Courses(course_id) 
+            FOREIGN KEY (parent) REFERENCES PrerequisitesRelationships(id)
         );
                          
-        CREATE TABLE IF NOT EXISTS PrerequisitesAND (
+        CREATE TABLE IF NOT EXISTS PrerequisiteCourses (
             course_id TEXT,
-            prereq_id TEXT,
-            parent TEXT,
-            PRIMARY KEY (course_id, prereq_id),
+            prereq_course_id TEXT,
+            relationship_id INTEGER,
             FOREIGN KEY (course_id) REFERENCES Courses(course_id),
-            FOREIGN KEY (prereq_id) REFERENCES Courses(course_id),
-            FOREIGN KEY (parent) REFERENCES Courses(course_id)         
+            FOREIGN KEY (prereq_course_id) REFERENCES Courses(course_id),
+            FOREIGN KEY (relationship_id) REFERENCES PrerequisiteRelationships(id)         
         );
                          
         CREATE TABLE IF NOT EXISTS GenEdRequirements (
@@ -227,6 +226,7 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
         c_repeatability = course["repeatability"]
         c_grading_option = course["gradingOption"]
         c_coreqs = course["corequisites"]
+        c_prereq_tree = course["prerequisiteTree"]
         cursor.execute('''
             INSERT OR REPLACE INTO Courses(course_id, department, 
                                            course_number, course_title,
@@ -243,6 +243,8 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
                 INSERT OR REPLACE INTO GenEdRequirements(course_id, ge_category, ge_id)
                 VALUES (?, ?, ?)       
             ''', (c_id, ge, ge_id))
+
+        _insert_prerequisite_tree(c_id, c_prereq_tree, cursor)
 
         # for prereq in course["prerequisites"]:
         #     prereq_id = prereq["id"]
@@ -510,6 +512,54 @@ def insert_major_course(major, parent_label, course_requirement, cursor):
                                                 course_count, group_label)
             VALUES (?, ?, ?, ?, ?)
         ''', (major, course, parent_label, course_count, group_label))
+
+def _insert_prerequisite_tree(course_id: str, prerequisite_tree, cursor, prev=None):
+   
+    insert_prereq_query = """
+        INSERT OR REPLACE INTO PrerequisiteRelationships(course_id, prereq_type, parent)
+        VALUES (?, ?, ?)
+    """
+
+    if ("AND" in prerequisite_tree.keys()):
+        cursor.execute(insert_prereq_query, (course_id, "AND", prev))
+        prev_rowid = cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
+        prev = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
+        _process_prerequisite_subtree(course_id, prerequisite_tree["AND"], cursor, prev)
+    elif("OR" in prerequisite_tree.keys()):
+        cursor.execute(insert_prereq_query, (course_id, "OR", prev))
+        prev_rowid = cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
+        prev = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
+        _process_prerequisite_subtree(course_id, prerequisite_tree["OR"], cursor, prev)
+    else:
+        return
+
+def _process_prerequisite_subtree(course_id: str, subtree_list: list, cursor, prev):
+    insert_prereq_query = """
+        INSERT OR REPLACE INTO PrerequisiteRelationships(course_id, prereq_type, parent)
+        VALUES (?, ?, ?)
+    """
+    for prereq_relationship in subtree_list:
+        if ("AND" in prereq_relationship.keys()):
+            cursor.execute(insert_prereq_query, (course_id, "AND", prev))
+            prev_rowid = cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
+            prev = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
+            _process_prerequisite_subtree(course_id, prereq_relationship["AND"], cursor, prev)
+        elif ("OR" in prereq_relationship.keys()):
+            cursor.execute(insert_prereq_query, (course_id, "OR", prev))
+            prev_rowid = cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
+            prev = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
+            _process_prerequisite_subtree(course_id, prereq_relationship["OR"], cursor, prev)
+        elif ("courseId" in prereq_relationship.keys()):
+            _process_prerequisite_course(course_id, prereq_relationship, cursor, prev)
+
+def _process_prerequisite_course(course_id: str, prereq: dict, cursor, parent_relationship):
+    query = """
+        INSERT OR REPLACE INTO PrerequisiteCourses(course_id, prereq_course_id, relationship_id)
+        VALUES (?, ?, ?)
+    """
+    prereq_course_id = prereq["courseId"]
+    prereq_course_id = "".join(prereq_course_id.split())
+    cursor.execute(query, (course_id, prereq_course_id, parent_relationship))
 
 
 def insert_term(year: int, quarter: str, db_path, *, cursor=None, update=False):
