@@ -1,5 +1,7 @@
 import sqlite3
 import json
+import os
+from user_index import create_user_index
 
 """ Run database.py and index.py before running this file """
 
@@ -18,7 +20,7 @@ GE_CATEGORIES = {
 
 }
 
-DB_PATH = "courses.db"
+DB_PATH = os.path.join(os.path.dirname(__file__), "courses.db")
 
 class CourseSearch():
     """
@@ -294,7 +296,7 @@ def create_index(path: str, course_data: list[dict]):
             ''', (cid, prereq_id))
 
         for term in course["terms"]:
-            year, quarter = term.lower().split()
+            year, quarter = term["term"].lower().split()
             cursor.execute('''
                 INSERT OR REPLACE INTO Terms(course_id, year, quarter)
                 VALUES (?, ?, ?)
@@ -421,6 +423,7 @@ def main():
     
 
 if __name__ == "__main__":
+    create_user_index()
     main()
     
     # spring_2026 = filter_course_term(2026, "Spring")

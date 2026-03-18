@@ -64,8 +64,40 @@ def api_search():
     ge      = request.args.get("ge", "")
     max_units = request.args.get("maxUnits", "")
     sort_by = request.args.get("sortBy", "relevance")
+    username = request.args.get("username")
+    time_pref = request.args.get("timeOfDay", "")
+
 
     conn = get_db()
+
+    user_profile = None
+    completed = set()
+    ge_needed = set()
+
+    if username:
+        user_profile = conn.execute("""
+            SELECT * FROM Users WHERE username = ?
+        """, (username,)).fetchone()
+
+
+        # convert to dict so you can safely use .get()
+        if user_profile:
+            user_profile = dict(user_profile)
+
+        if user_profile:
+            user_id = user_profile["id"]
+
+            # completed courses
+            rows = conn.execute("""
+                SELECT course_code FROM UserCompletedCourses WHERE user_id = ?
+            """, (user_id,)).fetchall()
+            completed = {r["course_code"] for r in rows}
+
+            # ge needs
+            rows = conn.execute("""
+                SELECT ge_category FROM UserGeNeeds WHERE user_id = ?
+            """, (user_id,)).fetchall()
+            ge_needed = {r["ge_category"] for r in rows}
 
     clauses = []
     params  = []
@@ -110,6 +142,15 @@ def api_search():
         )""")
         like = f"%{q}%"
         params.extend([like, like, like, like])
+    
+    if time_pref:
+        need_terms = True  # make sure we join Terms table
+        if time_pref.lower() == "morning":
+            clauses.append("T.start_time < '12:00'")
+        elif time_pref.lower() == "afternoon":
+            clauses.append("T.start_time >= '12:00' AND T.start_time < '17:00'")
+        elif time_pref.lower() == "evening":
+            clauses.append("T.start_time >= '17:00'")
 
     where = " AND ".join(clauses) if clauses else "1=1"
 
@@ -131,7 +172,6 @@ def api_search():
         {join_clause}
         WHERE {where}
         ORDER BY C.department, C.course_number
-        LIMIT 50
     """
 
     try:
@@ -207,6 +247,24 @@ def api_search():
             ge_names = ", ".join(f"GE {g}" for g in ge_list)
             explanation_parts.append(f"Satisfies {ge_names}")
 
+        score = 0
+        reasons = []
+        keywords = request.args.get("keywords", "")
+        keywords = keywords.split(",") if keywords else []
+
+        if user_profile:
+            score, reasons = compute_match_score(
+                course_id=cid,
+                user_profile=user_profile,
+                completed=completed,
+                ge_needed=ge_needed,
+                keywords=keywords
+            )
+
+        # fallback explanation if ranking doesn't provide one
+        if not reasons and explanation_parts:
+            reasons = explanation_parts
+
         courses.append({
             "id": cid,
             "code": f"{row['department']} {row['course_number']}",
@@ -220,7 +278,7 @@ def api_search():
             "format": "in-person",
             "ge": ge_list,
             "tags": tags,
-            "matchScore": 80,
+            "matchScore": score,
             "explanation": ". ".join(explanation_parts) if explanation_parts else "",
         })
 
@@ -230,6 +288,11 @@ def api_search():
         courses.sort(key=lambda c: c["units"], reverse=True)
     elif sort_by == "dept":
         courses.sort(key=lambda c: c["dept"])
+    elif sort_by == "relevance":
+        courses.sort(key=lambda c: c["matchScore"], reverse=True)
+    
+    # apply limit to 50 results
+    courses = courses[:50]
 
     conn.close()
     return jsonify({"courses": courses})

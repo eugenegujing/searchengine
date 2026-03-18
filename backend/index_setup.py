@@ -62,6 +62,7 @@ if __name__ == "__main__":
     # Loads the n most recent terms from the API
     n_terms = 10
     setup_index(n_terms)
+    
 
     
     
