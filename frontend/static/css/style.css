@@ -207,6 +207,7 @@ a {
 }
 
 .field input[type="text"],
+.field input[type="password"],
 .field select,
 .field textarea {
   width: 100%;
@@ -231,6 +232,33 @@ a {
 .field textarea {
   resize: vertical;
   min-height: 70px;
+}
+
+/* Password toggle eye button */
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper input {
+  padding-right: 2.5rem;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: var(--text-light);
+  padding: 0.2rem;
+  line-height: 1;
+}
+
+.toggle-password:hover {
+  color: var(--text);
 }
 
 /* Chip select (for multi-select like GE categories) */

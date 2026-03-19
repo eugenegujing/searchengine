@@ -221,8 +221,8 @@ def create_index(path: str, course_data: list[dict]):
         CREATE TABLE IF NOT EXISTS MajorCourses (
             major_id TEXT,
             course_id TEXT,
-            PRIMARY KEY (major_id, course_id)
-            FOREIGN KEY (major_id) REFERENCES Majors(major_id)
+            PRIMARY KEY (major_id, course_id),
+            FOREIGN KEY (major_id) REFERENCES Majors(major_id),
             FOREIGN KEY (course_id) REFERENCES Courses(course_id)
         );
                          
@@ -234,8 +234,8 @@ def create_index(path: str, course_data: list[dict]):
         CREATE TABLE IF NOT EXISTS MinorCourses (
         minor_id TEXT,
         course_id TEXT,
-        PRIMARY KEY (minor_id, course_id)
-        FOREIGN KEY (minor_id) REFERENCES Majors(minor_id)
+        PRIMARY KEY (minor_id, course_id),
+        FOREIGN KEY (minor_id) REFERENCES Minors(minor_id),
         FOREIGN KEY (course_id) REFERENCES Courses(course_id)
         );
                          
@@ -249,8 +249,8 @@ def create_index(path: str, course_data: list[dict]):
         CREATE TABLE IF NOT EXISTS SpecializationCourses (
             specialization_id TEXT,
             course_id TEXT,
-            PRIMARY KEY (specialization_id, course_id)
-            FOREIGN KEY (specialization_id) REFERENCES Majors(specialization_id)
+            PRIMARY KEY (specialization_id, course_id),
+            FOREIGN KEY (specialization_id) REFERENCES Specializations(specialization_id),
             FOREIGN KEY (course_id) REFERENCES Courses(course_id)
         );
                          
@@ -315,10 +315,10 @@ def filter_course_term(year: int, quarter: str, db_path):
         results = cursor.execute(query, (year, quarter)).fetchall()
     elif not year:
         query = "SELECT course_id FROM Terms WHERE quarter = ?"
-        results = cursor.execute(query, (quarter)).fetchall()
+        results = cursor.execute(query, (quarter,)).fetchall()
     elif not quarter:
         query = "SELECT course_id FROM Terms WHERE year = ?"
-        results = cursor.execute(query, (year)).fetchall()
+        results = cursor.execute(query, (year,)).fetchall()
     else:
         results = cursor.execute("SELECT course_id FROM Terms").fetchall()
 

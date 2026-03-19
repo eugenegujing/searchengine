@@ -1,4 +1,7 @@
-def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=None, course=None):
+import re
+
+
+def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=None, course=None, major_course_ids=None):
     """
     Compute a match score for a course given a user profile and optional keywords.
     :param course_id: string course identifier
@@ -7,12 +10,15 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=
     :param ge_needed: set of GE categories user still needs
     :param keywords: list of keywords to boost score
     :param course: optional dict containing course info (ge list, time, units, format)
+    :param major_course_ids: set of course_ids required for the user's major
     :return: (score:int, reasons:list[str])
     """
     score = 0
     reasons = []
 
     keywords = keywords or []
+    if major_course_ids is None:
+        major_course_ids = set()
 
     # keywords
     if "easy" in keywords:
@@ -22,17 +28,28 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=
         score += 15
         reasons.append("Online format")
     if "morning" in keywords:
-        if course and course.get("time", "").lower().find("am") != -1:
+        if course and _check_time_preference("morning", course.get("time", "")):
             score += 10
             reasons.append("Morning class")
     if "afternoon" in keywords:
-        if course and course.get("time", "").lower().find("pm") != -1:
+        if course and _check_time_preference("afternoon", course.get("time", "")):
             score += 10
             reasons.append("Afternoon class")
     if "evening" in keywords:
-        if course and course.get("time", "").lower().find("pm") != -1:
+        if course and _check_time_preference("evening", course.get("time", "")):
             score += 10
             reasons.append("Evening class")
+
+    # penalty for completed courses
+    if course_id in completed:
+        score -= 100  # already taken
+        reasons.append("Course already completed")
+        return max(score, 0), reasons
+
+    # major requirement
+    if course_id in major_course_ids:
+        score += 30
+        reasons.append("Required for your major")
 
     # ge needs
     if course and ge_needed:
@@ -45,18 +62,14 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=
     preferred_time = user_profile.get("preferred_time", "any")
     course_time = course.get("time", "") if course else ""
     if preferred_time != "any":
-        if preferred_time.lower() == "morning" and course_time.lower().find("am") != -1:
+        if _check_time_preference(preferred_time.lower(), course_time):
             score += 15
-            reasons.append("Matches morning preference")
-        elif preferred_time.lower() == "afternoon" and "pm" in course_time.lower():
-            score += 15
-            reasons.append("Matches afternoon preference")
-        elif preferred_time.lower() == "evening" and "pm" in course_time.lower():
-            score += 15
-            reasons.append("Matches evening preference")
+            reasons.append(f"Matches {preferred_time} preference")
 
     # workload/units
     max_units = user_profile.get("max_units", 4)
+    if isinstance(max_units, str):
+        max_units = int(max_units) if max_units.isdigit() else 4
     if course and course.get("units", 4) <= max_units:
         score += 10
         reasons.append(f"Units <= {max_units}")
@@ -68,9 +81,38 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=
         score += 10
         reasons.append(f"Preferred format: {course_format}")
 
-    # penalty for completed courses
-    if course_id in completed:
-        score -= 100  # already taken
-        reasons.append("Course already completed")
+    # workload preference
+    workload = (user_profile.get("workload") or "balanced").lower()
+    course_units = course.get("units", 4) if course else 4
+    if workload == "light" and course_units <= 3:
+        score += 10
+        reasons.append("Light workload course")
+    elif workload == "heavy" and course_units >= 4:
+        score += 5
 
-    return score, reasons
+    return max(score, 0), reasons
+
+
+def _check_time_preference(preference, time_str):
+    """
+    Check if a course time matches a time-of-day preference.
+    DB stores times in 24h format like '10:00', '14:30' (no am/pm),
+    so we extract the hour with regex.
+    """
+    if not time_str or time_str == "TBA":
+        return False
+
+    match = re.search(r'(\d{1,2}):(\d{2})', time_str)
+    if not match:
+        return False
+
+    hour = int(match.group(1))
+
+    if preference == "morning":
+        return hour < 12
+    elif preference == "afternoon":
+        return 12 <= hour < 17
+    elif preference == "evening":
+        return hour >= 17
+
+    return False

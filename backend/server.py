@@ -1,10 +1,13 @@
 import sys
 import os
+import re
 import sqlite3
+from collections import Counter
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from ranking import compute_match_score
+from user_index import create_user_index
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -34,11 +37,102 @@ GE_ID_TO_VALUE = {
     "5A": "Va", "5B": "Vb", "6": "VI", "7": "VII", "8": "VIII",
 }
 
+# ── Major name → department code mapping ──
+MAJOR_TO_DEPT = {
+    "Computer Science": "COMPSCI",
+    "Information and Computer Science": "I&C SCI",
+    "Informatics": "IN4MATX",
+    "Software Engineering": "IN4MATX",
+    "Data Science": "STATS",
+    "Statistics": "STATS",
+    "Mathematics": "MATH",
+    "Physics": "PHYSICS",
+    "Chemistry": "CHEM",
+    "Biology": "BIO SCI",
+    "Biological Sciences": "BIO SCI",
+    "Economics": "ECON",
+    "Psychology": "PSYCH",
+    "Social Science": "SOC SCI",
+    "Art": "ART",
+    "Music": "MUSIC",
+    "Writing": "WRITING",
+    "Humanities": "HUMAN",
+    "Computer Game Science": "COMPSCI",
+    "Business Information Management": "IN4MATX",
+}
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+# ── Build inverted index from course data ──
+
+STOP_WORDS = {
+    "a", "an", "the", "and", "or", "of", "in", "to", "for", "is", "on",
+    "at", "by", "with", "from", "as", "its", "it", "this", "that", "are",
+    "was", "be", "has", "had", "not", "but", "what", "all", "were", "we",
+    "when", "your", "can", "each", "which", "their", "if", "do", "will",
+    "about", "up", "out", "them", "then", "no", "into", "than", "other",
+    "div", "division",  # not useful as search terms
+}
+
+# ── Common abbreviations → actual department/index terms ──
+SYNONYMS = {
+    "cs": "compsci",
+    "ics": "compsci",
+    "info": "informatics",
+    "stats": "statistics",
+    "bio": "biological",
+    "chem": "chemistry",
+    "econ": "economics",
+    "psych": "psychology",
+    "phys": "physics",
+    "eng": "engineering",
+    "math": "math",
+    "poli": "political",
+    "anthro": "anthropology",
+    "soc": "social",
+}
+
+
+def build_inverted_index():
+    """Tokenize course titles + departments into InvertedCourseIndex table."""
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
+
+    # Check if already populated
+    count = cur.execute("SELECT count(*) FROM InvertedCourseIndex").fetchone()[0]
+    if count > 0:
+        conn.close()
+        return  # already built
+
+    rows = cur.execute(
+        "SELECT course_id, course_title, department, course_number FROM Courses"
+    ).fetchall()
+
+    index_data = []
+    for course_id, title, dept, number in rows:
+        # Combine title + department + course_number into one text
+        text = f"{title} {dept} {number}".lower()
+        # Tokenize: split on non-alphanumeric
+        tokens = re.findall(r"[a-z0-9]+", text)
+        # Remove stop words and count frequencies
+        filtered = [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
+        freq = Counter(filtered)
+
+        for term, count in freq.items():
+            index_data.append((course_id, term, count))
+
+    cur.executemany(
+        "INSERT OR IGNORE INTO InvertedCourseIndex (course_id, term, frequency) VALUES (?, ?, ?)",
+        index_data,
+    )
+    conn.commit()
+    conn.close()
+    print(f"Inverted index built: {len(index_data)} entries")
 
 
 # ─────────────── Serve frontend pages ───────────────
@@ -66,13 +160,14 @@ def api_search():
     sort_by = request.args.get("sortBy", "relevance")
     username = request.args.get("username")
     time_pref = request.args.get("timeOfDay", "")
-
+    pill = request.args.get("pill", "")
 
     conn = get_db()
 
     user_profile = None
     completed = set()
     ge_needed = set()
+    major_course_ids = set()
 
     if username:
         user_profile = conn.execute("""
@@ -98,6 +193,15 @@ def api_search():
                 SELECT ge_category FROM UserGeNeeds WHERE user_id = ?
             """, (user_id,)).fetchall()
             ge_needed = {r["ge_category"] for r in rows}
+
+            # major requirement courses
+            major_id = user_profile.get("major") or ""
+            if major_id:
+                rows = conn.execute("""
+                    SELECT course_id FROM MajorCourses
+                    WHERE major_id = ? AND course_id IS NOT NULL
+                """, (major_id,)).fetchall()
+                major_course_ids = {r["course_id"] for r in rows}
 
     clauses = []
     params  = []
@@ -133,15 +237,38 @@ def api_search():
         clauses.append("C.max_units <= ?")
         params.append(int(max_units))
 
+    # Extract special keywords from search query for ranking, search DB with remaining words
+    RANKING_KEYWORDS = {"easy", "online", "morning", "afternoon", "evening"}
+    FILTER_KEYWORDS = {"ge"}  # keywords that map to DB filters, not text search
+    LEVEL_KEYWORDS = {"upper", "lower"}  # treated as course level filters
+    search_keywords = []
+    search_terms = []
     if q:
-        clauses.append("""(
-            C.course_title LIKE ? OR
-            C.department LIKE ? OR
-            C.course_number LIKE ? OR
-            C.course_id LIKE ?
-        )""")
-        like = f"%{q}%"
-        params.extend([like, like, like, like])
+        for word in re.findall(r"[a-z0-9]+", q.lower()):
+            if word in RANKING_KEYWORDS:
+                search_keywords.append(word)
+            elif word in FILTER_KEYWORDS:
+                # "ge" → filter to courses with GE requirements
+                clauses.append("""C.course_id IN (
+                    SELECT DISTINCT course_id FROM GenEdRequirements
+                )""")
+            elif word in LEVEL_KEYWORDS:
+                # "upper" / "lower" → course level filter
+                if word == "upper":
+                    clauses.append("CAST(C.course_number AS INTEGER) >= 100")
+                else:
+                    clauses.append("CAST(C.course_number AS INTEGER) < 100")
+            elif word not in STOP_WORDS and len(word) > 1:
+                # Apply synonym mapping
+                mapped = SYNONYMS.get(word, word)
+                search_terms.append(mapped)
+
+        # Use inverted index: each search term must match
+        for term in search_terms:
+            clauses.append("""C.course_id IN (
+                SELECT course_id FROM InvertedCourseIndex WHERE term = ?
+            )""")
+            params.append(term)
     
     if time_pref:
         need_terms = True  # make sure we join Terms table
@@ -151,6 +278,38 @@ def api_search():
             clauses.append("T.start_time >= '12:00' AND T.start_time < '17:00'")
         elif time_pref.lower() == "evening":
             clauses.append("T.start_time >= '17:00'")
+
+    # ── Quick-filter pill logic ──
+    if pill == "lower-div":
+        clauses.append("CAST(C.course_number AS INTEGER) < 100")
+    elif pill == "upper-div":
+        clauses.append("CAST(C.course_number AS INTEGER) >= 100")
+        clauses.append("CAST(C.course_number AS INTEGER) < 200")
+    elif pill == "morning":
+        need_terms = True
+        clauses.append("T.start_time < '12:00'")
+        clauses.append("T.start_time != 'TBA'")
+    elif pill == "ge" and ge_needed:
+        # Convert short codes (e.g. "VI") to full DB names (e.g. "GE VI: Language Other Than English")
+        ge_full_names = []
+        for code in ge_needed:
+            full_name = GE_VALUE_TO_CATEGORY.get(code)
+            if full_name:
+                ge_full_names.append(full_name)
+            else:
+                ge_full_names.append(code)  # fallback: use as-is
+        if ge_full_names:
+            placeholders_ge = ",".join("?" * len(ge_full_names))
+            clauses.append(f"""C.course_id IN (
+                SELECT course_id FROM GenEdRequirements WHERE ge_category IN ({placeholders_ge})
+            )""")
+            params.extend(ge_full_names)
+    elif pill == "major" and user_profile:
+        major_name = (user_profile.get("major") or "").strip()
+        dept_code = MAJOR_TO_DEPT.get(major_name)
+        if dept_code:
+            clauses.append("C.department = ?")
+            params.append(dept_code)
 
     where = " AND ".join(clauses) if clauses else "1=1"
 
@@ -241,16 +400,27 @@ def api_search():
         tags = []
         if ge_list:
             tags.append("ge")
+        if cid in major_course_ids:
+            tags.append("major")
 
         explanation_parts = []
         if ge_list:
             ge_names = ", ".join(f"GE {g}" for g in ge_list)
             explanation_parts.append(f"Satisfies {ge_names}")
 
+        course_units = row["max_units"] or row["min_units"] or 4
+        course_time_str = f"{days_str} {time_str}".strip() if time_str else "TBA"
+
+        course_dict = {
+            "id": cid,
+            "ge": ge_list,
+            "time": course_time_str,
+            "units": course_units,
+            "format": "in-person",
+        }
+
         score = 0
         reasons = []
-        keywords = request.args.get("keywords", "")
-        keywords = keywords.split(",") if keywords else []
 
         if user_profile:
             score, reasons = compute_match_score(
@@ -258,8 +428,12 @@ def api_search():
                 user_profile=user_profile,
                 completed=completed,
                 ge_needed=ge_needed,
-                keywords=keywords
+                keywords=search_keywords,
+                course=course_dict,
+                major_course_ids=major_course_ids,
             )
+        else:
+            score = 50
 
         # fallback explanation if ranking doesn't provide one
         if not reasons and explanation_parts:
@@ -271,15 +445,15 @@ def api_search():
             "title": row["course_title"],
             "dept": row["department"],
             "level": level_str,
-            "units": row["max_units"] or row["min_units"] or 4,
+            "units": course_units,
             "instructor": "",
-            "time": f"{days_str} {time_str}".strip() if time_str else "TBA",
+            "time": course_time_str,
             "location": location,
             "format": "in-person",
             "ge": ge_list,
             "tags": tags,
             "matchScore": score,
-            "explanation": ". ".join(explanation_parts) if explanation_parts else "",
+            "explanation": ". ".join(reasons) if reasons else "",
         })
 
     if sort_by == "units-asc":
@@ -362,8 +536,8 @@ def api_register():
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json()
-    username = data["username"]
-    password = data["password"]
+    username = data.get("username", "").strip()
+    password = data.get("password", "")
 
     conn = get_db()
     cur = conn.cursor()
@@ -639,4 +813,8 @@ if __name__ == "__main__":
     if not Path(DB_PATH).exists():
         print(f"WARNING: Database not found at {DB_PATH}")
         print("Run index_setup.py first to build the database.")
+    # Ensure user tables exist (Users, UserGeNeeds, UserCompletedCourses)
+    create_user_index()
+    # Build inverted index if not already populated
+    build_inverted_index()
     app.run(debug=True, port=8080)

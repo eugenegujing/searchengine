@@ -38,7 +38,10 @@
 
       <div class="field">
         <label>Password</label>
-        <input type="text" id="password" placeholder="Enter your password">
+        <div class="password-wrapper">
+          <input type="password" id="password" placeholder="Enter your password">
+          <button type="button" class="toggle-password" onclick="togglePassword('password', this)">&#128065;</button>
+        </div>
       </div>
 
       <div class="btn-row">
@@ -54,6 +57,18 @@
   </div>
 </div>
 
+<script>
+function togglePassword(inputId, btn) {
+  const input = document.getElementById(inputId);
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '\u{1F648}';
+  } else {
+    input.type = 'password';
+    btn.textContent = '\u{1F441}';
+  }
+}
+</script>
 <script src="static/js/LoginPage.js"></script>
 </body>
 </html>
