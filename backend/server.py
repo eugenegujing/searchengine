@@ -109,6 +109,7 @@ def api_search():
     ge_needed = set()
     major_course_ids = set()
     prereq_map = {}
+    course_search = None
 
     if username:
         user_profile = conn.execute("""
@@ -168,7 +169,8 @@ def api_search():
             params.append(int(parts[0]))
             clauses.append("LOWER(T.quarter) = LOWER(?)")
             params.append(parts[1])
-            major_course_ids = course_search.search(parts[0], parts[1],include_prereq_unsatisfied=True,include_completed=False)
+            if course_search:
+                major_course_ids = course_search.search(parts[0], parts[1],include_prereq_unsatisfied=True,include_completed=False)
 
     if dept:
         clauses.append("C.department = ?")
@@ -332,11 +334,10 @@ def api_search():
             num = 0
         level_str = "lower" if num < 100 else "upper"
 
-        term_courses = course_terms.get(cid)
-        if (len(term_courses) == 0):
-            time_str = ""
-            days_str = ""
-            location = "TBA"
+        term_courses = course_terms.get(cid, [])
+        time_str = ""
+        days_str = ""
+        location = "TBA"
 
         for course in term_courses:
             if course["section_code"] % 10 == 0:
