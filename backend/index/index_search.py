@@ -192,7 +192,8 @@ class CourseSearch():
         for major_id in self.majors:
             major_courses = query_result_to_list(filter_course_major(major_id, self.db_path))
             for completed_course in self.completed:
-                major_courses.remove(completed_course)
+                if completed_course in major_courses:
+                    major_courses.remove(completed_course)
             completed, _, _ = filter_major_requirements(self.db_path, major_id, self.completed)
             for course_id in major_courses:
                 
@@ -246,19 +247,20 @@ def filter_course_term(year: int, quarter: str, db_path):
     
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    assert(quarter in QUARTERS.keys() or (quarter is None), "Invalid quarter argument")
     if (quarter is not None):
         quarter = quarter.lower()
+    assert quarter in QUARTERS.keys() or quarter is None, "Invalid quarter argument"
+    if (quarter is not None):
         quarter = QUARTERS[quarter]
     if (year and quarter):
         query = "SELECT * FROM Terms WHERE year = ? AND quarter = ?"
         results = cursor.execute(query, (year, quarter)).fetchall()
     elif not year and quarter:
         query = "SELECT * FROM Terms WHERE quarter = ?"
-        results = cursor.execute(query, (quarter)).fetchall()
+        results = cursor.execute(query, (quarter,)).fetchall()
     elif year and not quarter:
         query = "SELECT * FROM Terms WHERE year = ?"
-        results = cursor.execute(query, (year)).fetchall()
+        results = cursor.execute(query, (year,)).fetchall()
     else:
         results = cursor.execute("SELECT * FROM Terms").fetchall()
 
@@ -685,23 +687,6 @@ def get_requirements_with_no_child_courses(requirements: set, complete: dict, in
     for requirement in requirements:
         if ((requirement not in complete.keys()) and (requirement not in in_progress.keys())):
             res.add(requirement)
-    return res
-
-def get_units_from_course_lists(course_list: list, cursor=None, db_path=None):
-    if (cursor is None and db_path is None):
-        raise CourseSearchException("Must provide either database cursor or database path")
-    if (cursor is None):
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-    course_counts = defaultdict(int)
-    for course in course_list:
-        course_counts[course] = max(course_counts[course], course_list.count(course))
-
-    res = 0
-    for course, course_count in course_counts.items():
-        n_units = cursor.execute("SELECT min_units FROM Courses WHERE course_id = ?", (course,)).fetchall()[0][0]
-        res += n_units * course_count
-
     return res
 
 def merge_requirement_course_lists(course_lists: list[list]):

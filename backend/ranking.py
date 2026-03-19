@@ -44,7 +44,7 @@ def compute_match_score(
     course_format = (course.get("format", "in-person") if course else "in-person").lower()
     course_units = course.get("units", 4) if course else 4
     course_difficulty = (course.get("difficulty") or "medium").lower()
-    course_restrictions = (course.get("restrictions")).split(" and ")
+    course_restrictions = (course.get("restrictions") or "").split(" and ")
     course_level = course.get("level")
     sections = course.get("sections", []) if course else []
 
@@ -82,9 +82,8 @@ def compute_match_score(
         reasons.append("Upperclassmen restriction")
         return 0, reasons
     
-    print(course_level)
     # cannot take masters courses if undergrad
-    if ("BS-" in major_id or "BA-" in major_id) and course_level == "graduate":
+    if major_id and ("BS-" in major_id or "BA-" in major_id) and course_level == "graduate":
         reasons.append("Graduate restriction")
         return 0, reasons
 

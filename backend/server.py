@@ -296,7 +296,7 @@ def api_search():
 
     # Build a lookup of course_id -> first term info for the selected quarter
     course_terms = defaultdict(list)
-    if need_terms:
+    if need_terms and quarter:
         course_ids = [row["course_id"] for row in rows]
         if course_ids:
             placeholders = ",".join("?" * len(course_ids))
@@ -440,7 +440,7 @@ def api_search():
         courses.sort(key=lambda c: c["units"], reverse=True)
     elif sort_by == "dept":
         courses.sort(key=lambda c: c["dept"])
-    elif sort_by == "relevance" or "match-score":
+    elif sort_by in ("relevance", "match-score"):
         courses.sort(key=lambda c: c["matchScore"], reverse=True)
     
     # apply limit to 50 results

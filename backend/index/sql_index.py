@@ -691,6 +691,7 @@ def insert_term(year: int, quarter: str, db_path, *, cursor=None, update=False):
 
 def build_inverted_course_index(db_path, cursor=None):
     """Tokenize course titles + departments into InvertedCourseIndex table."""
+    conn = None
     if (not cursor):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -698,7 +699,8 @@ def build_inverted_course_index(db_path, cursor=None):
     # Check if already populated
     count = cursor.execute("SELECT count(*) FROM InvertedCourseIndex").fetchone()[0]
     if count > 0:
-        conn.close()
+        if conn:
+            conn.close()
         return  # already built
 
     rows = cursor.execute(
@@ -726,7 +728,8 @@ def build_inverted_course_index(db_path, cursor=None):
 
 
 def build_inverted_major_index(db_path, cursor=None):
-    """Tokenize course titles + departments into InvertedCourseIndex table."""
+    """Tokenize major names into InvertedMajorIndex table."""
+    conn = None
     if (not cursor):
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -734,7 +737,8 @@ def build_inverted_major_index(db_path, cursor=None):
     # Check if already populated
     count = cursor.execute("SELECT count(*) FROM InvertedMajorIndex").fetchone()[0]
     if count > 0:
-        conn.close()
+        if conn:
+            conn.close()
         return  # already built
 
     rows = cursor.execute(
