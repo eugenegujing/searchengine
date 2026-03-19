@@ -302,7 +302,9 @@ def api_search():
             placeholders = ",".join("?" * len(course_ids))
             parts = quarter.split("-")
             term_rows = conn.execute(f"""
-                SELECT course_id, section_code, start_time, end_time, days, building_id, room_number, restrictions
+                SELECT course_id, section_code, start_time, end_time, days, building_id, 
+                       room_number, restrictions, max_capacity, num_currently_enrolled,
+                       waitlist_capacity, num_on_waitlist
                 FROM Terms
                 WHERE course_id IN ({placeholders}) AND year = ? AND LOWER(quarter) = LOWER(?)
             """, course_ids + [int(parts[0]), parts[1]]).fetchall()
@@ -353,70 +355,70 @@ def api_search():
                 location = " ".join(location_parts) or "TBA"
         
 
-        ge_list = course_ge.get(cid, [])
-        tags = []
-        if ge_list:
-            tags.append("ge")
-        if cid in major_course_ids:
-            tags.append("major")
+                ge_list = course_ge.get(cid, [])
+                tags = []
+                if ge_list:
+                    tags.append("ge")
+                if cid in major_course_ids:
+                    tags.append("major")
 
-        explanation_parts = []
-        if ge_list:
-            ge_names = ", ".join(f"GE {g}" for g in ge_list)
-            explanation_parts.append(f"Satisfies {ge_names}")
+                explanation_parts = []
+                if ge_list:
+                    ge_names = ", ".join(f"GE {g}" for g in ge_list)
+                    explanation_parts.append(f"Satisfies {ge_names}")
 
-        course_units = row["max_units"] or row["min_units"] or 4
-        course_time_str = f"{days_str} {time_str}".strip() if time_str else "TBA"
-        course_restrictions = course["restrictions"]
+                course_units = row["max_units"] or row["min_units"] or 4
+                course_time_str = f"{days_str} {time_str}".strip() if time_str else "TBA"
+                course_restrictions = course["restrictions"]
 
-        course_dict = {
-            "id": cid,
-            "ge": ge_list,
-            "time": course_time_str,
-            "units": course_units,
-            "format": "in-person",
-            "restrictions": course_restrictions
-        }
+                course_dict = {
+                    "id": cid,
+                    "ge": ge_list,
+                    "time": course_time_str,
+                    "units": course_units,
+                    "format": "in-person",
+                    "restrictions": course_restrictions
+                }
 
-        score = 0
-        reasons = []
+                score = 0
+                reasons = []
 
-        if user_profile:
-            score, reasons = compute_match_score(
-                course_id=cid,
-                user_profile=user_profile,
-                completed=completed,
-                ge_needed=ge_needed,
-                db_path=DB_PATH,
-                course_search=course_search,
-                keywords=search_keywords,
-                course=course_dict,
-                major_course_ids=major_course_ids,
-                prereq_map=prereq_map,
-            )
-        else:
-            score = 50
+                if user_profile:
+                    score, reasons = compute_match_score(
+                        course_id=cid,
+                        user_profile=user_profile,
+                        completed=completed,
+                        ge_needed=ge_needed,
+                        db_path=DB_PATH,
+                        course_search=course_search,
+                        keywords=search_keywords,
+                        course=course_dict,
+                        major_course_ids=major_course_ids,
+                        prereq_map=prereq_map,
+                    )
+                else:
+                    score = 50
 
-        # fallback explanation if ranking doesn't provide one
-        if not reasons and explanation_parts:
-            reasons = explanation_parts
+                # fallback explanation if ranking doesn't provide one
+                if not reasons and explanation_parts:
+                    reasons = explanation_parts
 
-        courses.append({
-            "id": cid,
-            "code": f"{row['department']} {row['course_number']}",
-            "title": row["course_title"],
-            "dept": row["department"],
-            "level": level_str,
-            "units": course_units,
-            "instructor": "",
-            "time": course_time_str,
-            "location": location,
-            "format": "in-person",
-            "ge": ge_list,
-            "tags": tags,
-            "matchScore": score,
-            "explanation": ". ".join(reasons) if reasons else "",
-        })
+                courses.append({
+                    "id": cid,
+                    "code": f"{row['department']} {row['course_number']}",
+                    "title": row["course_title"],
+                    "dept": row["department"],
+                    "level": level_str,
+                    "units": course_units,
+                    "instructor": "",
+                    "time": course_time_str,
+                    "location": location,
+                    "format": "in-person",
+                    "ge": ge_list,
+                    "tags": tags,
+                    "matchScore": score,
+                    "explanation": ". ".join(reasons) if reasons else "",
+                })
 
     if sort_by == "units-asc":
         courses.sort(key=lambda c: c["units"])

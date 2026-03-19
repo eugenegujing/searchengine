@@ -163,6 +163,7 @@ def compute_match_score(
             score += 5
 
     # section availability bonus
+    # print(sections)
     if sections:
         score += min(len(sections), 5)
         reasons.append(f"{len(sections)} section option(s)")

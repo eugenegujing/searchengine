@@ -199,7 +199,6 @@ class CourseSearch():
                 requirement_query = "SELECT group_label FROM MajorCourses WHERE major_id = ? AND course_id = ?"
                 potential_requirements = cursor.execute(requirement_query, (major_id, course_id)).fetchall()
                 any_requirements_incomplete = False
-                print(course_id, potential_requirements)
                 for requirement in potential_requirements:
                     if requirement[0] not in completed.keys():
                         any_requirements_incomplete = True
