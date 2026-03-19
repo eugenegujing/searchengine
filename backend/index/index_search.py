@@ -61,6 +61,10 @@ class CourseSearch():
             raise ValueError
         self.completed.append(course_id)
 
+    def add_prerequisite_list(self, course_list):
+        for course_id in course_list:
+            self.add_prerequisite(course_id)
+
     def _add_sqlite_result_to_set(self, sqlite_res: tuple, set_out: set):
         """
         takes sqlite output in the form of ((X,), (Y,), (Z,)) and adds X, Y, and Z to a set
@@ -728,6 +732,15 @@ def get_prerequisites(course_id: str, db_path: str):
     
     return results
 
+def get_dependencies(course_id: str, db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    query = "SELECT course_id FROM PrerequisiteCourses WHERE prereq_course_id = ?"
+    results = cursor.execute(query, (course_id,)).fetchall()
+    
+    return results
+
+
 def check_prerequisites(course_id: str, completed_courses: list[str], db_path: str):
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -801,3 +814,16 @@ def check_prerequisites(course_id: str, completed_courses: list[str], db_path: s
         processed_prereqs.add(relationship_id)
 
     return len(processed_prereqs) == len(completed_prereqs)
+
+def get_or_courses(course_id: str, prereq_id: str, db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    res = []
+    or_prereq_query = "SELECT id FROM PrerequisiteRelationships WHERE prereq_type = 'OR' AND course_id = ?"
+    relationship_ids = cursor.execute(or_prereq_query, (course_id,)).fetchall()
+    prereq_id_query = "SELECT prereq_course_id FROM PrerequisiteCourses WHERE course_id = ? AND relationship_id = ?"
+    for relationship_id in relationship_ids:
+        res.append(cursor.execute(prereq_id_query, (course_id, relationship_id[0],)).fetchone()[0])
+
+    return res
+    

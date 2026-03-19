@@ -1,5 +1,5 @@
 import re
-from index.index_search import check_prerequisites
+from index.index_search import *
 
 
 def compute_match_score(course_id, user_profile, completed, ge_needed, db_path, keywords=None, course=None, major_course_ids=None, prereq_map=None):
@@ -59,12 +59,30 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, db_path, 
     if check_prerequisites(course_id, completed, db_path):
         score += 10
         reasons.append("Prerequisite completed")
+    else:
+        score -= 1000
     # prereqs = prereq_map.get(course_id, set())
     # if prereqs and completed:
     #     met = prereqs & completed
     #     if met:
     #         score += 10
     #         reasons.append("Prerequisite completed")
+
+    # dependency bonus: if course is a prerequisite for many major courses, increase score
+    course_dependencies = get_dependencies(course_id, db_path)
+    for course_dependency in course_dependencies:
+        if (course_dependency in filter_course_major(user_profile.get("major"), db_path)):
+            or_courses = get_or_courses(course_dependency[0], course_id, db_path)
+            is_or_satisfied = len(set(completed).intersection(set(or_courses)))
+            if (not is_or_satisfied):
+                score += (len(course_dependencies)) / 10
+    # course_search = CourseSearch(db_path)
+    # course_search.add_major(user_profile.get("major"))
+    # course_search.add_prerequisite_list(completed)
+    # completed_reqs, in_progress_reqs, not_started_reqs = course_search.get_all_major_requirement_completion()
+    # for course_list in completed_reqs.values():
+    #     if (course_id in course_list):
+        
 
     # ge needs
     if course and ge_needed:
