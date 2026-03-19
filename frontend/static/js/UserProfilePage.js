@@ -26,6 +26,21 @@ function prevStep() {
   if (currentStep > 1) showStep(currentStep - 1);
 }
 
+/* ---------- Load majors dropdown from API ---------- */
+
+fetch('/api/majors')
+  .then(res => res.json())
+  .then(majors => {
+    const sel = document.getElementById('majorSelect');
+    majors.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.name;
+      sel.appendChild(opt);
+    });
+  })
+  .catch(err => console.error('Failed to load majors:', err));
+
 /* ---------- Chip toggle (GE categories) ---------- */
 
 document.querySelectorAll('.chip-group .chip').forEach(chip => {
@@ -56,7 +71,7 @@ function gatherProfile() {
     displayName:      document.getElementById('displayName').value.trim() || 'Student',
     standing:         standing ? standing.value : '',
     college:          document.getElementById('college').value,
-    major:            document.getElementById('majorInput').value.trim(),
+    major:            document.getElementById('majorSelect').value,
     minor:            document.getElementById('minorInput').value.trim(),
     priority:         priority ? priority.value : 'degree',
     geNeeded:         geNeeded,
