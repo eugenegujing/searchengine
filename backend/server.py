@@ -384,6 +384,7 @@ def api_search():
                 user_profile=user_profile,
                 completed=completed,
                 ge_needed=ge_needed,
+                db_path=DB_PATH,
                 keywords=search_keywords,
                 course=course_dict,
                 major_course_ids=major_course_ids,

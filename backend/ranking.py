@@ -1,7 +1,8 @@
 import re
+from index.index_search import check_prerequisites
 
 
-def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=None, course=None, major_course_ids=None, prereq_map=None):
+def compute_match_score(course_id, user_profile, completed, ge_needed, db_path, keywords=None, course=None, major_course_ids=None, prereq_map=None):
     """
     Compute a match score for a course given a user profile and optional keywords.
     :param course_id: string course identifier
@@ -55,12 +56,15 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=
         reasons.append("Required for your major")
 
     # prerequisite bonus: if user completed a prereq for this course, +10
-    prereqs = prereq_map.get(course_id, set())
-    if prereqs and completed:
-        met = prereqs & completed
-        if met:
-            score += 10
-            reasons.append("Prerequisite completed")
+    if check_prerequisites(course_id, completed, db_path):
+        score += 10
+        reasons.append("Prerequisite completed")
+    # prereqs = prereq_map.get(course_id, set())
+    # if prereqs and completed:
+    #     met = prereqs & completed
+    #     if met:
+    #         score += 10
+    #         reasons.append("Prerequisite completed")
 
     # ge needs
     if course and ge_needed:
