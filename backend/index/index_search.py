@@ -68,8 +68,8 @@ class CourseSearch():
         for res in sqlite_res:
             set_out.add(res[0])
 
-    def search(self, year=None, quarter=None):
-        quarter = quarter.lower()
+    def search(self, year=None, quarter=None, include_prereq_unsatisfied=False, include_completed=False):
+
         for major_id in self.majors:
             sql_out = filter_course_major(major_id, self.db_path)
             self._add_sqlite_result_to_set(sql_out, self.courses)
@@ -78,11 +78,12 @@ class CourseSearch():
             sql_out = filter_course_minor(minor_id, self.db_path)
             self._add_sqlite_result_to_set(sql_out, self.courses)
         
-        for course_id in set(self.completed):
-            try:
-                self.courses.remove(course_id)
-            except KeyError:
-                pass
+        if (not include_completed):
+            for course_id in set(self.completed):
+                try:
+                    self.courses.remove(course_id)
+                except KeyError:
+                    pass
 
         term_results = filter_course_term(year, quarter, self.db_path)
         if len(self.majors) == 0:
@@ -93,9 +94,13 @@ class CourseSearch():
             self.courses = term_set & self.courses
 
         results = set()
+        
         for course in self.courses:
-            prereqs_completed = check_prerequisites(course, set(self.completed), self.db_path)
-            if prereqs_completed:
+            if (include_prereq_unsatisfied):
+                is_prereqs_completed = True
+            else:
+                is_prereqs_completed = check_prerequisites(course, set(self.completed), self.db_path)
+            if is_prereqs_completed:
                 results.add(course)
         return results
     
@@ -211,19 +216,20 @@ def get_specialization_data(db_path, specialization_id):
 
 
 def filter_course_term(year: int, quarter: str, db_path):
-    quarter = quarter.lower()
+    
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     assert(quarter in QUARTERS.keys() or (quarter is None), "Invalid quarter argument")
     if (quarter is not None):
+        quarter = quarter.lower()
         quarter = QUARTERS[quarter]
     if (year and quarter):
         query = "SELECT * FROM Terms WHERE year = ? AND quarter = ?"
         results = cursor.execute(query, (year, quarter)).fetchall()
-    elif not year:
+    elif not year and quarter:
         query = "SELECT * FROM Terms WHERE quarter = ?"
         results = cursor.execute(query, (quarter)).fetchall()
-    elif not quarter:
+    elif year and not quarter:
         query = "SELECT * FROM Terms WHERE year = ?"
         results = cursor.execute(query, (year)).fetchall()
     else:
