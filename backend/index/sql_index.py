@@ -4,7 +4,17 @@ from collections import defaultdict
 from index.index_search import *
 from index.common import *
 import data_collection
+import re
+from collections import Counter
 
+STOP_WORDS = {
+    "a", "an", "the", "and", "or", "of", "in", "to", "for", "is", "on",
+    "at", "by", "with", "from", "as", "its", "it", "this", "that", "are",
+    "was", "be", "has", "had", "not", "but", "what", "all", "were", "we",
+    "when", "your", "can", "each", "which", "their", "if", "do", "will",
+    "about", "up", "out", "them", "then", "no", "into", "than", "other",
+    "div", "division"
+}
 
 def create_index(db_path: str, course_data: list[dict], major_data: list[dict], 
                  minor_data: list[dict], specialization_data: list[dict], n_terms=None):
@@ -213,6 +223,17 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
                          
         CREATE INDEX IF NOT EXISTS idx_courseterms
         ON InvertedCourseIndex(course_id, term);
+
+        CREATE TABLE IF NOT EXISTS InvertedMajorIndex (
+            major_id TEXT,
+            term TEXT,
+            frequency INTEGER,
+            PRIMARY KEY (major_id, term),
+            FOREIGN KEY (major_id) REFERENCES Majors(major_id)
+        );
+                         
+        CREATE INDEX IF NOT EXISTS idx_majorterms
+        ON InvertedMajorIndex(major_id, term);
                          
     ''')
 
@@ -274,7 +295,10 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
         print(f"Inserting into term {quarter} {year}")
         insert_term(year, quarter, db_path, cursor=cursor, update=False)
         
+    build_inverted_course_index(db_path, cursor)
+    build_inverted_major_index(db_path, cursor)
     conn.commit()
+
     print("Database created at", db_path)
     return conn
 
@@ -663,6 +687,79 @@ def insert_term(year: int, quarter: str, db_path, *, cursor=None, update=False):
             cursor.execute(query, args)
         if (conn):
             conn.commit()
+
+
+def build_inverted_course_index(db_path, cursor=None):
+    """Tokenize course titles + departments into InvertedCourseIndex table."""
+    if (not cursor):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+    # Check if already populated
+    count = cursor.execute("SELECT count(*) FROM InvertedCourseIndex").fetchone()[0]
+    if count > 0:
+        conn.close()
+        return  # already built
+
+    rows = cursor.execute(
+        "SELECT course_id, course_title, department, course_number FROM Courses"
+    ).fetchall()
+
+    index_data = []
+    for course_id, title, dept, number in rows:
+        # Combine title + department + course_number into one text
+        text = f"{title} {dept} {number}".lower()
+        # Tokenize: split on non-alphanumeric
+        tokens = re.findall(r"[a-z0-9]+", text)
+        # Remove stop words and count frequencies
+        filtered = [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
+        freq = Counter(filtered)
+
+        for term, count in freq.items():
+            index_data.append((course_id, term, count))
+
+    cursor.executemany(
+        "INSERT OR IGNORE INTO InvertedCourseIndex (course_id, term, frequency) VALUES (?, ?, ?)",
+        index_data,
+    )
+    print(f"Inverted course index built: {len(index_data)} entries")
+
+
+def build_inverted_major_index(db_path, cursor=None):
+    """Tokenize course titles + departments into InvertedCourseIndex table."""
+    if (not cursor):
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+    # Check if already populated
+    count = cursor.execute("SELECT count(*) FROM InvertedMajorIndex").fetchone()[0]
+    if count > 0:
+        conn.close()
+        return  # already built
+
+    rows = cursor.execute(
+        "SELECT major_id, major_name FROM Majors"
+    ).fetchall()
+
+    index_data = []
+    for major_id, major_name in rows:
+        # Combine title + department + course_number into one text
+        text = f"{major_name}".lower()
+        # Tokenize: split on non-alphanumeric
+        tokens = re.findall(r"[a-z0-9]+", text)
+        # Remove stop words and count frequencies
+        filtered = [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
+        freq = Counter(filtered)
+
+        for term, count in freq.items():
+            index_data.append((major_id, term, count))
+
+    cursor.executemany(
+        "INSERT OR IGNORE INTO InvertedMajorIndex (major_id, term, frequency) VALUES (?, ?, ?)",
+        index_data,
+    )
+    print(f"Inverted major index built: {len(index_data)} entries")
+
 
 
 # def main(n_terms=20):

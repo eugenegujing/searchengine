@@ -4,6 +4,7 @@ from pathlib import Path
 
 import index.sql_index as sql_index
 import data_collection
+from user_index import create_user_index
 
 """
 
@@ -30,8 +31,12 @@ def setup_index(n_terms):
     db_path = Path(DB_PATH)
     db_path.unlink(missing_ok=True)
 
-    sql_index.create_index(DB_PATH, all_course_data, all_major_data, 
-                 all_minor_data, all_spec_data, n_terms)
+    conn = sql_index.create_index(DB_PATH, all_course_data, all_major_data, 
+                                  all_minor_data, all_spec_data, n_terms)
+    conn.close()
+    create_user_index()
+    
+    
     
 def retrieve_api_course_data(force=False):
     data_jsons = [

@@ -97,44 +97,6 @@ SYNONYMS = {
     "soc": "social",
 }
 
-
-def build_inverted_index():
-    """Tokenize course titles + departments into InvertedCourseIndex table."""
-    conn = sqlite3.connect(DB_PATH)
-    cur = conn.cursor()
-
-    # Check if already populated
-    count = cur.execute("SELECT count(*) FROM InvertedCourseIndex").fetchone()[0]
-    if count > 0:
-        conn.close()
-        return  # already built
-
-    rows = cur.execute(
-        "SELECT course_id, course_title, department, course_number FROM Courses"
-    ).fetchall()
-
-    index_data = []
-    for course_id, title, dept, number in rows:
-        # Combine title + department + course_number into one text
-        text = f"{title} {dept} {number}".lower()
-        # Tokenize: split on non-alphanumeric
-        tokens = re.findall(r"[a-z0-9]+", text)
-        # Remove stop words and count frequencies
-        filtered = [t for t in tokens if t not in STOP_WORDS and len(t) > 1]
-        freq = Counter(filtered)
-
-        for term, count in freq.items():
-            index_data.append((course_id, term, count))
-
-    cur.executemany(
-        "INSERT OR IGNORE INTO InvertedCourseIndex (course_id, term, frequency) VALUES (?, ?, ?)",
-        index_data,
-    )
-    conn.commit()
-    conn.close()
-    print(f"Inverted index built: {len(index_data)} entries")
-
-
 # ─────────────── Serve frontend pages ───────────────
 
 @app.route("/")
@@ -814,7 +776,7 @@ if __name__ == "__main__":
         print(f"WARNING: Database not found at {DB_PATH}")
         print("Run index_setup.py first to build the database.")
     # Ensure user tables exist (Users, UserGeNeeds, UserCompletedCourses)
-    create_user_index()
+    # create_user_index()
     # Build inverted index if not already populated
-    build_inverted_index()
+    # build_inverted_index()
     app.run(debug=True, port=8080)
