@@ -335,7 +335,12 @@ def api_search():
             num = int("".join(c for c in course_number_str if c.isdigit()) or "0")
         except ValueError:
             num = 0
-        level_str = "lower" if num < 100 else "upper"
+        if num < 100:
+            level_str = "lower"
+        elif num < 200:
+            level_str = "upper"
+        else:
+            level_str = "graduate"
 
         term_courses = course_terms.get(cid, [])
         time_str = ""
@@ -370,6 +375,10 @@ def api_search():
                 course_units = row["max_units"] or row["min_units"] or 4
                 course_time_str = f"{days_str} {time_str}".strip() if time_str else "TBA"
                 course_restrictions = course["restrictions"]
+                max_capacity = course["max_capacity"]
+                num_currently_enrolled = course["num_currently_enrolled"]
+                waitlist_capacity = course["waitlist_capacity"]
+                num_on_waitlist = course["num_on_waitlist"]
 
                 course_dict = {
                     "id": cid,
@@ -377,7 +386,12 @@ def api_search():
                     "time": course_time_str,
                     "units": course_units,
                     "format": "in-person",
-                    "restrictions": course_restrictions
+                    "level": level_str,
+                    "restrictions": course_restrictions,
+                    "maxCapacity": max_capacity,
+                    "numCurrentlyEnrolled": num_currently_enrolled,
+                    "waitlistCapacity": waitlist_capacity,
+                    "numOnWaitlist": num_on_waitlist
                 }
 
                 score = 0

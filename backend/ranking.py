@@ -45,7 +45,12 @@ def compute_match_score(
     course_units = course.get("units", 4) if course else 4
     course_difficulty = (course.get("difficulty") or "medium").lower()
     course_restrictions = (course.get("restrictions")).split(" and ")
+    course_level = course.get("level")
     sections = course.get("sections", []) if course else []
+
+    enrolled = course.get("numCurrentlyEnrolled")
+    cap = course.get("maxCapacity")
+    wait = course.get("numOnWaitlist")
 
     # keywords
     if "easy" in keywords:
@@ -69,24 +74,29 @@ def compute_match_score(
 
     # penalty for completed courses
     if course_id in completed:
-        score -= 1000 # already taken
         reasons.append("Course already completed")
-        return max(score, 0), reasons
+        return 0, reasons
     
     # cannot take J restricted courses if freshman or sophomore standing
     if "J" in course_restrictions and standing in ("Freshman", "Sophomore"):
-        score -= 1000 # already taken
         reasons.append("Upperclassmen restriction")
-        return max(score, 0), reasons
+        return 0, reasons
+    
+    print(course_level)
+    # cannot take masters courses if undergrad
+    if ("BS-" in major_id or "BA-" in major_id) and course_level == "graduate":
+        reasons.append("Graduate restriction")
+        return 0, reasons
 
     # prerequisite completion
     if check_prerequisites(course_id, completed, db_path):
         score += 15
         reasons.append("Prerequisites completed")
     else:
-        score -= 1000
         reasons.append("Prerequisites not satisfied")
-    
+        return 0, reasons
+
+
     if major_id:
         major_rows = filter_course_major(major_id, db_path)
         major_course_set = set(r[0] for r in major_rows)
@@ -170,15 +180,15 @@ def compute_match_score(
 
         open_sections = 0
         low_wait_sections = 0
-        for sec in sections:
-            enrolled = _safe_int(sec.get("numCurrentlyEnrolled"), default=None)
-            cap = _safe_int(sec.get("maxCapacity"), default=None)
-            wait = _safe_int(sec.get("numOnWaitlist"), default=None)
+        # for sec in sections:
+            # enrolled = _safe_int(sec.get("numCurrentlyEnrolled"), default=None)
+            # cap = _safe_int(sec.get("maxCapacity"), default=None)
+            # wait = _safe_int(sec.get("numOnWaitlist"), default=None)
 
-            if cap is not None and enrolled is not None and enrolled < cap:
-                open_sections += 1
-            if wait is not None and wait == 0:
-                low_wait_sections += 1
+        if cap is not None and enrolled is not None and enrolled < cap:
+            open_sections += 1
+        if wait is not None and wait == 0:
+            low_wait_sections += 1
 
         if open_sections > 0:
             score += min(open_sections, 3) * 2

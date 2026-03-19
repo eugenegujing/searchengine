@@ -205,6 +205,9 @@ function buildCourseCard(c) {
   if (c.level === 'upper') {
     tagsHtml += '<span class="tag tag-info">Upper Div</span>';
   }
+  else if (c.level === 'graduate') {
+    tagsHtml += '<span class="tag tag-info">Graduate</span>';
+  }
 
   card.innerHTML = `
     <div class="card-top">
