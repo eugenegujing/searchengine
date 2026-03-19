@@ -107,6 +107,7 @@ def api_search():
     completed = set()
     ge_needed = set()
     major_course_ids = set()
+    prereq_map = {}
 
     if username:
         user_profile = conn.execute("""
@@ -121,11 +122,18 @@ def api_search():
         if user_profile:
             user_id = user_profile["id"]
 
-            # completed courses
+            # completed courses (stored as course_id, e.g. "ICS31")
             rows = conn.execute("""
                 SELECT course_code FROM UserCompletedCourses WHERE user_id = ?
             """, (user_id,)).fetchall()
             completed = {r["course_code"] for r in rows}
+
+            # build prereq_map: course_id -> set of prereq_course_ids
+            prereq_rows = conn.execute("""
+                SELECT course_id, prereq_course_id FROM PrerequisiteCourses
+            """).fetchall()
+            for pr in prereq_rows:
+                prereq_map.setdefault(pr["course_id"], set()).add(pr["prereq_course_id"])
 
             # ge needs
             rows = conn.execute("""
@@ -368,6 +376,7 @@ def api_search():
                 keywords=search_keywords,
                 course=course_dict,
                 major_course_ids=major_course_ids,
+                prereq_map=prereq_map,
             )
         else:
             score = 50
@@ -435,6 +444,54 @@ def api_majors():
     except Exception:
         conn.close()
         return jsonify([])
+
+
+@app.route("/api/major-courses/<major_id>")
+def api_major_courses(major_id):
+    """Return required courses for a major, grouped into categories."""
+    conn = get_db()
+    try:
+        rows = conn.execute("""
+            SELECT MC.course_id, MC.group_label,
+                   C.department, C.course_number, C.course_title
+            FROM MajorCourses MC
+            JOIN Courses C ON MC.course_id = C.course_id
+            WHERE MC.major_id = ? AND MC.course_id IS NOT NULL
+            ORDER BY C.department, C.course_number
+        """, (major_id,)).fetchall()
+        conn.close()
+
+        # Count courses per group_label to classify
+        from collections import Counter
+        group_counts = Counter(r["group_label"] for r in rows)
+
+        core = []
+        electives = []
+        ge = []
+        seen = set()
+
+        for r in rows:
+            cid = r["course_id"]
+            if cid in seen:
+                continue
+            seen.add(cid)
+            entry = {
+                "course_id": cid,
+                "code": f"{r['department']} {r['course_number']}",
+                "title": r["course_title"],
+            }
+            gl = (r["group_label"] or "").lower()
+            if "ge " in gl or "ge-" in gl or gl.startswith("ge"):
+                ge.append(entry)
+            elif group_counts[r["group_label"]] > 10:
+                electives.append(entry)
+            else:
+                core.append(entry)
+
+        return jsonify({"core": core, "electives": electives, "ge": ge})
+    except Exception:
+        conn.close()
+        return jsonify({"core": [], "electives": [], "ge": []})
     
 # ─────────────── API: Register ───────────────
 

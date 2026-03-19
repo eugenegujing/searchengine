@@ -247,11 +247,12 @@
         <!-- ========== STEP 4: Completed Courses (Optional) ========== -->
         <div class="form-step" data-step="4">
           <h2>Courses Already Taken</h2>
-          <p class="step-desc">This helps us avoid recommending things you have already completed and check prerequisites. You can always update this later.</p>
+          <p class="step-desc">Click courses you have completed to mark them. This helps us avoid recommending things you have already taken and check prerequisites.</p>
 
-          <div class="field">
-            <label for="completedCourses">Completed Courses <span class="optional">optional — comma separated</span></label>
-            <textarea id="completedCourses" placeholder="e.g. ICS 31, MATH 2B, WRITING 50"></textarea>
+          <div class="field" id="completedCoursesField">
+            <label>Required Courses for Your Major <span class="optional">click to mark as completed</span></label>
+            <p id="noMajorHint" class="step-desc" style="margin-bottom:0;">Please select a major in Step 2 to see your required courses.</p>
+            <div class="course-chips-grid" id="completedCoursesGrid"></div>
           </div>
 
           <div class="field">

@@ -1,16 +1,17 @@
 import re
 
 
-def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=None, course=None, major_course_ids=None):
+def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=None, course=None, major_course_ids=None, prereq_map=None):
     """
     Compute a match score for a course given a user profile and optional keywords.
     :param course_id: string course identifier
     :param user_profile: dict of user info (preferredTime, courseFormat, maxUnits, geNeeded)
-    :param completed: set of completed course codes
+    :param completed: set of completed course ids
     :param ge_needed: set of GE categories user still needs
     :param keywords: list of keywords to boost score
     :param course: optional dict containing course info (ge list, time, units, format)
     :param major_course_ids: set of course_ids required for the user's major
+    :param prereq_map: dict mapping course_id -> set of prereq_course_ids
     :return: (score:int, reasons:list[str])
     """
     score = 0
@@ -19,6 +20,8 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=
     keywords = keywords or []
     if major_course_ids is None:
         major_course_ids = set()
+    if prereq_map is None:
+        prereq_map = {}
 
     # keywords
     if "easy" in keywords:
@@ -50,6 +53,14 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, keywords=
     if course_id in major_course_ids:
         score += 30
         reasons.append("Required for your major")
+
+    # prerequisite bonus: if user completed a prereq for this course, +10
+    prereqs = prereq_map.get(course_id, set())
+    if prereqs and completed:
+        met = prereqs & completed
+        if met:
+            score += 10
+            reasons.append("Prerequisite completed")
 
     # ge needs
     if course and ge_needed:
