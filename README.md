@@ -87,8 +87,140 @@ searchengine/
 
 ## Database Schema
 
+The SQLite database is built in `backend/index/sql_index.py` and stores both static catalog metadata and term-specific meeting data.
+
+### Core tables
+
+#### `Courses`
+Stores general course metadata.
+
+| Column | Description |
+|--------|-------------|
+| `course_id` | Canonical course id (ex: `I&CSCI31`) |
+| `department` | Department code / name |
+| `course_number` | Course number |
+| `course_title` | Official course title |
+| `min_units` | Minimum units |
+| `max_units` | Maximum units |
+| `repeatability` | Repeatability metadata |
+| `grading_option` | Grading option |
+| `corequisites` | Corequisite text |
+
+#### `Terms`
+Stores term-specific section and meeting information from WebSOC.
+
+| Column | Description |
+|--------|-------------|
+| `course_id` | References `Courses.course_id` |
+| `section_code` | WebSOC section code |
+| `section_type` | Lecture / discussion / lab / etc. |
+| `year` | Academic year |
+| `quarter` | Quarter code |
+| `building_id` | Building code |
+| `room_number` | Room number |
+| `start_time` | Start time |
+| `end_time` | End time |
+| `days` | Meeting days |
+| `restrictions` | Enrollment restrictions |
+| `max_capacity` | Section capacity |
+| `num_currently_enrolled` | Current enrollment |
+| `waitlist_capacity` | Waitlist capacity |
+| `num_on_waitlist` | Current waitlist count |
+| `is_cancelled` | Cancellation flag |
+
+### Requirement tables
+
+These tables support degree-aware search and ranking.
+
+#### `Majors`
+Stores major metadata.
+
+#### `MajorRequirements`
+Stores hierarchical graduation requirement groups for each major.
+
+#### `MajorCourses`
+Maps courses to major requirements and requirement groups.
+
+#### `Minors`
+Stores minor metadata.
+
+#### `MinorRequirements`
+Stores minor requirement groups.
+
+#### `MinorCourses`
+Maps courses to minor requirements.
+
+#### `Specializations`
+Stores specialization metadata and parent major relationship.
+
+#### `SpecializationRequirements`
+Stores specialization requirement groups.
+
+#### `SpecializationCourses`
+Maps courses to specialization requirements.
+
+### Prerequisite tables
+
+#### `PrerequisiteRelationships`
+Stores AND / OR prerequisite tree structure.
+
+#### `PrerequisiteCourses`
+Stores actual prerequisite courses belonging to each relationship node.
+
+This allows the system to evaluate more complex prerequisite logic than a flat prerequisite list.
+
+### GE tables
+
+#### `GenEdRequirements`
+Maps courses to UCI GE categories.
+
+### Inverted index tables
+
+#### `InvertedCourseIndex`
+Stores token frequencies for course title / department / number search.
+
+#### `InvertedMajorIndex`
+Stores token frequencies for major-name search.
+
+---
+
 ## Search
 
-## Ranking
+Search is handled primarily through `CourseSearch` in `backend/index/index_search.py`.
 
-## Demo Flow
+### Supported search/filter features
+
+The backend can filter courses by:
+
+- term (`year`, `quarter`)
+- selected major(s)
+- selected minor(s)
+- selected specialization(s)
+- completed prerequisites
+- major / minor / specialization requirement progress
+- GE needs
+- text query terms through inverted indexes
+
+### Query flow
+
+At a high level, the system does the following:
+
+1. Load relevant requirement-linked course ids from the database.
+2. Intersect them with term availability from `Terms`.
+3. Remove already completed courses if requested.
+4. Check prerequisite satisfaction using the prerequisite relationship tree.
+5. Return feasible results.
+6. Optionally apply ranking and sort by score.
+
+### Example usage
+
+```python
+from index.index_search import CourseSearch
+
+search = CourseSearch("courses.db")
+search.add_major("BS-201")
+search.add_prerequisite("MATH1B")
+
+results = search.search(2026, "Spring")
+for course in results:
+    print(course)
