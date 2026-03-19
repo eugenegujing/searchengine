@@ -184,6 +184,8 @@ class CourseSearch():
             tuple with requirement information => (completed, in progress, not started)
         """
         return filter_specialization_requirements(self.db_path, specialization_id, self.completed)
+    
+
 
 #===================================================================================
 
@@ -828,3 +830,16 @@ def get_or_courses(course_id: str, prereq_id: str, db_path: str):
 
     return res
     
+def check_major_requirement_contribution(course_id: str, major_id: str, completed_courses: list, db_path: str):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    completed, _, _ = filter_major_requirements(db_path, major_id, completed_courses)
+    requirement_query = "SELECT group_label FROM MajorCourses WHERE major_id = ? AND course_id = ?"
+    potential_requirements = cursor.execute(requirement_query, (major_id, course_id)).fetchall()
+    any_requirements_incomplete = False
+    for requirement in potential_requirements:
+        if requirement[0] not in completed.keys():
+            any_requirements_incomplete = True
+            break
+
+    return any_requirements_incomplete

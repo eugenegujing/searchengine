@@ -55,27 +55,33 @@ def compute_match_score(course_id, user_profile, completed, ge_needed, db_path, 
         score += 30
         reasons.append("Required for your major")
 
-    # prerequisite bonus: if user completed a prereq for this course, +10
-    if check_prerequisites(course_id, completed, db_path):
-        score += 10
-        reasons.append("Prerequisite completed")
-    else:
-        score -= 1000
+        # prerequisite bonus: if user completed a prereq for this course, +10
+        prerequisites_completed = check_prerequisites(course_id, completed, db_path)
+        course_progresses_major_requirements = check_major_requirement_contribution(course_id, user_profile.get("major"), completed, db_path)
+        if prerequisites_completed and course_progresses_major_requirements:
+            score += 10
+            reasons.append("Prerequisite completed")
+
+        else:
+            score -= 1000
+            reasons.append("Prerequisite incomplete")
     # prereqs = prereq_map.get(course_id, set())
     # if prereqs and completed:
     #     met = prereqs & completed
     #     if met:
     #         score += 10
     #         reasons.append("Prerequisite completed")
-
     # dependency bonus: if course is a prerequisite for many major courses, increase score
-    course_dependencies = get_dependencies(course_id, db_path)
-    for course_dependency in course_dependencies:
-        if (course_dependency in filter_course_major(user_profile.get("major"), db_path)):
-            or_courses = get_or_courses(course_dependency[0], course_id, db_path)
-            is_or_satisfied = len(set(completed).intersection(set(or_courses)))
-            if (not is_or_satisfied):
-                score += (len(course_dependencies)) / 10
+        course_dependencies = get_dependencies(course_id, db_path)
+        for course_dependency in course_dependencies:
+            if (course_dependency in filter_course_major(user_profile.get("major"), db_path)):
+                or_courses = get_or_courses(course_dependency[0], course_id, db_path)
+                if (len(or_courses) > 0):
+                    is_or_satisfied = len(set(completed).intersection(set(or_courses)))
+                else:
+                    is_or_satisfied = 1
+                if (not is_or_satisfied):
+                    score += (len(course_dependencies)) / 10
     # course_search = CourseSearch(db_path)
     # course_search.add_major(user_profile.get("major"))
     # course_search.add_prerequisite_list(completed)
