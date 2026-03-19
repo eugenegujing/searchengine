@@ -37,29 +37,6 @@ GE_ID_TO_VALUE = {
     "5A": "Va", "5B": "Vb", "6": "VI", "7": "VII", "8": "VIII",
 }
 
-# ── Major name → department code mapping ──
-MAJOR_TO_DEPT = {
-    "Computer Science": "COMPSCI",
-    "Information and Computer Science": "I&C SCI",
-    "Informatics": "IN4MATX",
-    "Software Engineering": "IN4MATX",
-    "Data Science": "STATS",
-    "Statistics": "STATS",
-    "Mathematics": "MATH",
-    "Physics": "PHYSICS",
-    "Chemistry": "CHEM",
-    "Biology": "BIO SCI",
-    "Biological Sciences": "BIO SCI",
-    "Economics": "ECON",
-    "Psychology": "PSYCH",
-    "Social Science": "SOC SCI",
-    "Art": "ART",
-    "Music": "MUSIC",
-    "Writing": "WRITING",
-    "Humanities": "HUMAN",
-    "Computer Game Science": "COMPSCI",
-    "Business Information Management": "IN4MATX",
-}
 
 
 def get_db():
@@ -304,12 +281,10 @@ def api_search():
                 SELECT course_id FROM GenEdRequirements WHERE ge_category IN ({placeholders_ge})
             )""")
             params.extend(ge_full_names)
-    elif pill == "major" and user_profile:
-        major_name = (user_profile.get("major") or "").strip()
-        dept_code = MAJOR_TO_DEPT.get(major_name)
-        if dept_code:
-            clauses.append("C.department = ?")
-            params.append(dept_code)
+    elif pill == "major" and major_course_ids:
+        placeholders_mc = ",".join("?" * len(major_course_ids))
+        clauses.append(f"C.course_id IN ({placeholders_mc})")
+        params.extend(major_course_ids)
 
     where = " AND ".join(clauses) if clauses else "1=1"
 
