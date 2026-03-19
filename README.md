@@ -224,3 +224,133 @@ search.add_prerequisite("MATH1B")
 results = search.search(2026, "Spring")
 for course in results:
     print(course)
+```
+
+## Ranking
+
+Ranking is implemented in `ranking.py` using the function: `compute_match_score(…)`
+
+The system assigns a score to each course based on multiple factors and returns both:
+- a numeric score
+- a list of human-readable reasons (for explainability)
+
+---
+
+### Ranking Signals
+
+Courses are scored using a combination of academic relevance, user preferences, and real-world scheduling constraints.
+
+#### 🎓 Academic Relevance
+
+- **Major requirement** (+30)  
+  Courses required for the selected major are prioritized.
+
+- **Prerequisite completion** (+15 / disqualify if unmet)  
+  Courses with unmet prerequisites are heavily penalized.
+
+- **Dependency bonus** (+ up to 15)  
+  Courses that unlock future required courses are boosted.
+
+---
+
+#### 📚 Graduation Progress
+
+- **GE requirement match** (+20)  
+  Courses satisfying remaining GE categories are prioritized.
+
+---
+
+#### ⏰ User Preferences
+
+- **Preferred time match** (+15)  
+  Morning / afternoon / evening preferences.
+
+- **Preferred format** (+10)  
+  Online vs in-person preference.
+
+- **Unit constraint** (+10)  
+  Courses within the user's max unit limit.
+
+- **Workload preference**
+  - Light workload → prefer low-unit / low-difficulty courses
+  - Heavy workload → slight boost for higher-unit courses
+
+---
+
+#### 🔍 Keyword Boosts
+
+Optional keyword-based boosts:
+
+- `"morning"`, `"afternoon"`, `"evening"` → +10
+- `"online"` → +15 (only if actually online)
+- `"easy"` → small boost (+5)
+
+---
+
+#### 🏫 Section & Availability Signals
+
+- **More sections available** (+ up to 5)
+- **Open seats available** (+ up to 6)
+- **Low or no waitlist** (+ up to 2)
+
+These signals prioritize courses that are easier to enroll in.
+
+---
+
+### Contextual Scheduling Penalties
+
+The ranking system adapts dynamically based on the student's current schedule.
+
+- **Time conflicts** (−40)  
+  Courses overlapping with existing schedule are heavily penalized.
+
+- **Walking distance penalty** (−10)  
+  Consecutive classes in different buildings are penalized.
+
+- **Final exam conflict** (−15)  
+  Courses with finals on the same day are penalized.
+
+---
+
+### Scoring Output
+
+- Each ranked result includes:
+`{
+“course_id”: “I&CSCI32”,
+“score”: 78,
+“reasons”: [
+“Required for your major”,
+“Prerequisites completed”,
+“Matches morning preference”,
+“Units <= 4”,
+“3 section option(s)”
+]
+}`
+---
+
+### Key Design Principles
+
+- **Explainability**  
+  Every score includes reasons to justify ranking decisions.
+
+- **Personalization**  
+  Results change based on user profile and schedule.
+
+- **Feasibility-first**  
+  Courses that cannot be taken (prereqs not met) are filtered out.
+
+- **Real-world constraints**  
+  Uses actual meeting times, enrollment data, and schedule conflicts.
+
+---
+
+### Summary
+
+The ranking system is not static — it dynamically adapts based on:
+
+- academic progress (major / prerequisites / GE)
+- user preferences (time, format, workload)
+- real schedule constraints (conflicts, walking, finals)
+- enrollment feasibility (sections, waitlist)
+
+This produces a more realistic and useful course recommendation experience compared to simple filtering or keyword search.
