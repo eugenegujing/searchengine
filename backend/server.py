@@ -2,12 +2,13 @@ import sys
 import os
 import re
 import sqlite3
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from ranking import compute_match_score
 from user_index import create_user_index
+from index.index_search import CourseSearch
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -136,11 +137,16 @@ def api_search():
             # major requirement courses
             major_id = user_profile.get("major") or ""
             if major_id:
-                rows = conn.execute("""
-                    SELECT course_id FROM MajorCourses
-                    WHERE major_id = ? AND course_id IS NOT NULL
-                """, (major_id,)).fetchall()
-                major_course_ids = {r["course_id"] for r in rows}
+                course_search = CourseSearch(DB_PATH)
+                course_search.add_major(major_id)
+                for course_id in completed:
+                    course_search.add_prerequisite(course_id)
+                major_course_ids = course_search.search(include_prereq_unsatisfied=True,include_completed=False)
+                # rows = conn.execute("""
+                #     SELECT course_id FROM MajorCourses
+                #     WHERE major_id = ? AND course_id IS NOT NULL
+                # """, (major_id,)).fetchall()
+                # major_course_ids = {r["course_id"] for r in rows}
 
     clauses = []
     params  = []
@@ -154,6 +160,7 @@ def api_search():
             params.append(int(parts[0]))
             clauses.append("LOWER(T.quarter) = LOWER(?)")
             params.append(parts[1])
+            major_course_ids = course_search.search(parts[0], parts[1],include_prereq_unsatisfied=True,include_completed=False)
 
     if dept:
         clauses.append("C.department = ?")
@@ -277,20 +284,19 @@ def api_search():
         return jsonify({"courses": [], "error": "Database not ready. Run index_setup.py first."})
 
     # Build a lookup of course_id -> first term info for the selected quarter
-    course_terms = {}
+    course_terms = defaultdict(list)
     if need_terms:
         course_ids = [row["course_id"] for row in rows]
         if course_ids:
             placeholders = ",".join("?" * len(course_ids))
             parts = quarter.split("-")
             term_rows = conn.execute(f"""
-                SELECT course_id, start_time, end_time, days, building_id, room_number
+                SELECT course_id, section_code, start_time, end_time, days, building_id, room_number
                 FROM Terms
                 WHERE course_id IN ({placeholders}) AND year = ? AND LOWER(quarter) = LOWER(?)
             """, course_ids + [int(parts[0]), parts[1]]).fetchall()
             for tr in term_rows:
-                if tr["course_id"] not in course_terms:
-                    course_terms[tr["course_id"]] = tr
+                course_terms[tr["course_id"]].append(tr)
 
     try:
         ge_rows = conn.execute("""
@@ -318,20 +324,24 @@ def api_search():
             num = 0
         level_str = "lower" if num < 100 else "upper"
 
-        term = course_terms.get(cid)
-        if term:
-            time_str = format_time(term["start_time"], term["end_time"])
-            days_str = term["days"] or ""
-            location_parts = []
-            if term["building_id"] and term["building_id"] != "TBA":
-                location_parts.append(term["building_id"])
-            if term["room_number"]:
-                location_parts.append(str(term["room_number"]))
-            location = " ".join(location_parts) or "TBA"
-        else:
+        term_courses = course_terms.get(cid)
+        if (len(term_courses) == 0):
             time_str = ""
             days_str = ""
             location = "TBA"
+
+        for course in term_courses:
+            if course["section_code"] % 10 == 0:
+                term = course
+                time_str = format_time(term["start_time"], term["end_time"])
+                days_str = term["days"] or ""
+                location_parts = []
+                if term["building_id"] and term["building_id"] != "TBA":
+                    location_parts.append(term["building_id"])
+                if term["room_number"]:
+                    location_parts.append(str(term["room_number"]))
+                location = " ".join(location_parts) or "TBA"
+        
 
         ge_list = course_ge.get(cid, [])
         tags = []
