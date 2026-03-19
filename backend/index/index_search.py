@@ -35,6 +35,7 @@ class CourseSearch():
         self.minors = set()
         self.specializations = set()
         self.completed = []
+        self.remaining_courses = []
 
     def add_major(self, major_id):
         self.majors.add(major_id)
@@ -185,7 +186,28 @@ class CourseSearch():
         """
         return filter_specialization_requirements(self.db_path, specialization_id, self.completed)
     
+    def init_major_requirement_contribution(self):
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        for major_id in self.majors:
+            major_courses = query_result_to_list(filter_course_major(major_id, self.db_path))
+            for completed_course in self.completed:
+                major_courses.remove(completed_course)
+            completed, _, _ = filter_major_requirements(self.db_path, major_id, self.completed)
+            for course_id in major_courses:
+                
+                requirement_query = "SELECT group_label FROM MajorCourses WHERE major_id = ? AND course_id = ?"
+                potential_requirements = cursor.execute(requirement_query, (major_id, course_id)).fetchall()
+                any_requirements_incomplete = False
+                print(course_id, potential_requirements)
+                for requirement in potential_requirements:
+                    if requirement[0] not in completed.keys():
+                        any_requirements_incomplete = True
+                        self.remaining_courses.append(course_id)
+                        break
 
+    def get_remaining_courses(self):
+        return self.remaining_courses
 
 #===================================================================================
 

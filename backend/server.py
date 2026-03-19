@@ -150,7 +150,8 @@ def api_search():
                 course_search.add_major(major_id)
                 for course_id in completed:
                     course_search.add_prerequisite(course_id)
-                major_course_ids = course_search.search(include_prereq_unsatisfied=True,include_completed=False)
+                course_search.init_major_requirement_contribution()
+                major_course_ids = course_search.search(include_prereq_unsatisfied=False,include_completed=False)
                 # rows = conn.execute("""
                 #     SELECT course_id FROM MajorCourses
                 #     WHERE major_id = ? AND course_id IS NOT NULL
@@ -170,7 +171,7 @@ def api_search():
             clauses.append("LOWER(T.quarter) = LOWER(?)")
             params.append(parts[1])
             if course_search:
-                major_course_ids = course_search.search(parts[0], parts[1],include_prereq_unsatisfied=True,include_completed=False)
+                major_course_ids = course_search.search(parts[0], parts[1],include_prereq_unsatisfied=False,include_completed=False)
 
     if dept:
         clauses.append("C.department = ?")
@@ -301,7 +302,7 @@ def api_search():
             placeholders = ",".join("?" * len(course_ids))
             parts = quarter.split("-")
             term_rows = conn.execute(f"""
-                SELECT course_id, section_code, start_time, end_time, days, building_id, room_number
+                SELECT course_id, section_code, start_time, end_time, days, building_id, room_number, restrictions
                 FROM Terms
                 WHERE course_id IN ({placeholders}) AND year = ? AND LOWER(quarter) = LOWER(?)
             """, course_ids + [int(parts[0]), parts[1]]).fetchall()
@@ -366,6 +367,7 @@ def api_search():
 
         course_units = row["max_units"] or row["min_units"] or 4
         course_time_str = f"{days_str} {time_str}".strip() if time_str else "TBA"
+        course_restrictions = course["restrictions"]
 
         course_dict = {
             "id": cid,
@@ -373,6 +375,7 @@ def api_search():
             "time": course_time_str,
             "units": course_units,
             "format": "in-person",
+            "restrictions": course_restrictions
         }
 
         score = 0
@@ -385,6 +388,7 @@ def api_search():
                 completed=completed,
                 ge_needed=ge_needed,
                 db_path=DB_PATH,
+                course_search=course_search,
                 keywords=search_keywords,
                 course=course_dict,
                 major_course_ids=major_course_ids,
@@ -420,7 +424,7 @@ def api_search():
         courses.sort(key=lambda c: c["units"], reverse=True)
     elif sort_by == "dept":
         courses.sort(key=lambda c: c["dept"])
-    elif sort_by == "relevance":
+    elif sort_by == "relevance" or "match-score":
         courses.sort(key=lambda c: c["matchScore"], reverse=True)
     
     # apply limit to 50 results
