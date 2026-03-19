@@ -798,6 +798,7 @@ def check_prerequisites(course_id: str, completed_courses: list[str], db_path: s
                     break
 
         elif (relationship_type == "OR"):
+            
             relationship_completed = False
             for course in relationship_courses:
                 if (course in completed_courses) or (course in completed_prereqs):

@@ -233,6 +233,11 @@ class TestSQLIndex(unittest.TestCase):
 
         completed.append("COMPSCI112")
         self.assertTrue(check_prerequisites(course_id, completed, TEST_DB_PATH))
+
+    def test_more_prerequisites(self):
+        course_id = "COMPSCI171"
+        completed = ["MATH2A", "MATH2B"]
+        self.assertFalse(check_prerequisites(course_id, completed, TEST_DB_PATH))
         
 
 class TestCourseSearch(unittest.TestCase):

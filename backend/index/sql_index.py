@@ -566,13 +566,13 @@ def _process_prerequisite_subtree(course_id: str, subtree_list: list, cursor, pr
         if ("AND" in prereq_relationship.keys()):
             cursor.execute(insert_prereq_query, (course_id, "AND", prev))
             prev_rowid = cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
-            prev = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
-            _process_prerequisite_subtree(course_id, prereq_relationship["AND"], cursor, prev)
+            parent = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
+            _process_prerequisite_subtree(course_id, prereq_relationship["AND"], cursor, parent)
         elif ("OR" in prereq_relationship.keys()):
             cursor.execute(insert_prereq_query, (course_id, "OR", prev))
             prev_rowid = cursor.execute("SELECT last_insert_rowid()").fetchone()[0]
-            prev = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
-            _process_prerequisite_subtree(course_id, prereq_relationship["OR"], cursor, prev)
+            parent = cursor.execute("SELECT id FROM PrerequisiteRelationships WHERE rowid = ?", (prev_rowid,)).fetchone()[0]
+            _process_prerequisite_subtree(course_id, prereq_relationship["OR"], cursor, parent)
         elif ("courseId" in prereq_relationship.keys()):
             _process_prerequisite_course(course_id, prereq_relationship, cursor, prev)
 
