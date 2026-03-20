@@ -208,6 +208,13 @@ function buildCourseCard(c) {
   else if (c.level === 'graduate') {
     tagsHtml += '<span class="tag tag-info">Graduate</span>';
   }
+  if (c.averageGPA != null) {
+    const gpa = c.averageGPA.toFixed(2);
+    let gpaClass = 'tag-gpa-mid';
+    if (c.averageGPA >= 3.4) gpaClass = 'tag-gpa-high';
+    else if (c.averageGPA < 3.0) gpaClass = 'tag-gpa-low';
+    tagsHtml += `<span class="tag ${gpaClass}">Avg GPA: ${gpa}</span>`;
+  }
 
   card.innerHTML = `
     <div class="card-top">
@@ -221,6 +228,7 @@ function buildCourseCard(c) {
       <span>${c.units} units</span>
       <span>${c.time}</span>
       <span>${c.location}</span>
+      ${c.instructor && c.instructor !== 'TBA' ? `<span>${c.instructor}</span>` : ''}
     </div>
     ${tagsHtml ? `<div class="tags">${tagsHtml}</div>` : ''}
     ${c.explanation ? `<div class="explanation">${c.explanation}</div>` : ''}

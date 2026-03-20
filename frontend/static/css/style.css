@@ -764,6 +764,9 @@ a {
 .tag-prereq    { background: #fef3c7; color: #92400e; }
 .tag-warning   { background: #fee2e2; color: #991b1b; }
 .tag-info      { background: #f0f0ff; color: #4338ca; }
+.tag-gpa-high  { background: #dcfce7; color: #166534; }
+.tag-gpa-mid   { background: #fef3c7; color: #92400e; }
+.tag-gpa-low   { background: #fee2e2; color: #991b1b; }
 
 /* Explanation snippet */
 .course-card .explanation {

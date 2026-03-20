@@ -16,8 +16,9 @@ STOP_WORDS = {
     "div", "division"
 }
 
-def create_index(db_path: str, course_data: list[dict], major_data: list[dict], 
-                 minor_data: list[dict], specialization_data: list[dict], n_terms=None):
+def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
+                 minor_data: list[dict], specialization_data: list[dict],
+                 grade_data: list[dict]=None, n_terms=None):
     
     """
     create_index: creates tables and indexes for provided course data
@@ -85,6 +86,7 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
             waitlist_capacity TEXT,
             num_on_waitlist TEXT,
             is_cancelled INTEGER,
+            instructor TEXT,
             PRIMARY KEY (section_code, year, quarter),
             FOREIGN KEY (course_id) REFERENCES Courses(course_id),
             FOREIGN KEY (building_id) REFERENCES Buildings(building_id)
@@ -213,6 +215,17 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
             FOREIGN KEY (requirement_label) REFERENCES SpecializationRequirements(requirement_label)
         );
                          
+        CREATE TABLE IF NOT EXISTS CourseGrades (
+            course_id TEXT PRIMARY KEY,
+            average_gpa REAL,
+            grade_a_count INTEGER,
+            grade_b_count INTEGER,
+            grade_c_count INTEGER,
+            grade_d_count INTEGER,
+            grade_f_count INTEGER,
+            FOREIGN KEY (course_id) REFERENCES Courses(course_id)
+        );
+
         CREATE TABLE IF NOT EXISTS InvertedCourseIndex (
             course_id TEXT,
             term TEXT,
@@ -285,6 +298,21 @@ def create_index(db_path: str, course_data: list[dict], major_data: list[dict],
     print("Processing Specialization Requirements")
     for specialization in specialization_data:
         insert_specialization(specialization, cursor=cursor, db_path=db_path)
+
+    if grade_data:
+        print("Processing Grade Data")
+        for grade in grade_data:
+            dept = "".join(grade["department"].split())
+            course_id = dept + grade["courseNumber"]
+            cursor.execute('''
+                INSERT OR REPLACE INTO CourseGrades(course_id, average_gpa,
+                    grade_a_count, grade_b_count, grade_c_count,
+                    grade_d_count, grade_f_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (course_id, grade.get("averageGPA"),
+                  grade.get("gradeACount", 0), grade.get("gradeBCount", 0),
+                  grade.get("gradeCCount", 0), grade.get("gradeDCount", 0),
+                  grade.get("gradeFCount", 0)))
 
     terms = data_collection.fetch_terms()
     if (n_terms is not None):
@@ -645,13 +673,13 @@ def insert_term(year: int, quarter: str, db_path, *, cursor=None, update=False):
 
     else:
         query = """
-            INSERT OR REPLACE INTO TERMS(course_id, section_code, section_type, 
+            INSERT OR REPLACE INTO TERMS(course_id, section_code, section_type,
                                         year, quarter, building_id, room_number,
-                                        start_time, end_time, days,restrictions, 
+                                        start_time, end_time, days, restrictions,
                                         max_capacity, num_currently_enrolled,
                                         waitlist_capacity, num_on_waitlist,
-                                        is_cancelled)
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                        is_cancelled, instructor)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         for course in term:
             course_id = "".join(course["department"].split()) + course["courseNumber"]
@@ -678,11 +706,13 @@ def insert_term(year: int, quarter: str, db_path, *, cursor=None, update=False):
             num_on_waitlist = course["numOnWaitlist"]
             is_cancelled = int(course["isCancelled"])
 
-            args = (course_id, course["sectionCode"], course["sectionType"], 
+            instructor = course.get("instructor", "TBA")
+
+            args = (course_id, course["sectionCode"], course["sectionType"],
                     year, quarter, course["buildingCode"], course["roomNumber"],
-                    start_time, end_time, days, restrictions, max_capacity, 
-                    currently_enrolled, waitlist_cap, num_on_waitlist, 
-                    is_cancelled)
+                    start_time, end_time, days, restrictions, max_capacity,
+                    currently_enrolled, waitlist_cap, num_on_waitlist,
+                    is_cancelled, instructor)
             
             cursor.execute(query, args)
         if (conn):

@@ -9,9 +9,23 @@ MAJOR_URL = "https://anteaterapi.com/v2/rest/programs/majors"
 MINOR_URL = "https://anteaterapi.com/v2/rest/programs/minors"
 SPECIALIZATION_URL = "https://anteaterapi.com/v2/rest/programs/specializations"
 TERM_URL = "https://anteaterapi.com/v2/rest/websoc/terms"
+GRADES_URL = "https://anteaterapi.com/v2/rest/grades/aggregateByCourse"
 
 TAKE = 100 # load data in batches
-SLEEP_TIME = 0.5 # avoid overloading api
+SLEEP_TIME = 1.0 # avoid overloading api
+
+def _request_with_retry(url, params=None, max_retries=5):
+    """Make a GET request with automatic retry on 429 rate limit."""
+    for attempt in range(max_retries):
+        response = requests.get(url, params=params)
+        if response.status_code == 429:
+            wait = 15 * (attempt + 1)
+            print(f"\n  Rate limited, retrying in {wait}s...", end='')
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        return response
+    response.raise_for_status()  # raise on final failure
 
 LOADING_CHARS = ['|', '/', '—', '\\']
 
@@ -25,8 +39,7 @@ def fetch_courses(cursor=None, take=TAKE):
         if cursor is not None:
             params["cursor"] = cursor
 
-        response = requests.get(COURSEDATA_URL, params=params)
-        response.raise_for_status()
+        response = _request_with_retry(COURSEDATA_URL, params=params)
         data = response.json().get("data")
 
         # check if data exists --> prevent crashes
@@ -62,8 +75,7 @@ def fetch_courses(cursor=None, take=TAKE):
     return all_courses
 
 def fetch_majors():
-    response = requests.get(MAJOR_URL)
-    response.raise_for_status()
+    response = _request_with_retry(MAJOR_URL)
     majors = response.json().get("data", [])
 
     # check if data exists
@@ -82,8 +94,7 @@ def fetch_majors():
         
         program_id = major["id"]
         URL = f"https://anteaterapi.com/v2/rest/programs/major?programId={program_id}"
-        response = requests.get(URL)
-        response.raise_for_status()
+        response = _request_with_retry(URL)
         requirements = response.json().get("data", [])
 
         # merge major information with requirements
@@ -91,7 +102,7 @@ def fetch_majors():
         major_copy["requirements"] = requirements
 
         all_major_data.append(major_copy)
-        time.sleep(SLEEP_TIME)  # sleep 100ms between requests --> avoid client error
+        time.sleep(SLEEP_TIME)
     
     # write to json file
     with open("all_major_data.json", "w") as f:
@@ -100,8 +111,7 @@ def fetch_majors():
     print(f"\nSaved {len(all_major_data)} majors.")
 
 def fetch_minors():
-    response = requests.get(MINOR_URL)
-    response.raise_for_status()
+    response = _request_with_retry(MINOR_URL)
     minors = response.json().get("data", [])
 
     # check if data exists
@@ -120,8 +130,7 @@ def fetch_minors():
         
         program_id = minor["id"]
         URL = f"https://anteaterapi.com/v2/rest/programs/minor?programId={program_id}"
-        response = requests.get(URL)
-        response.raise_for_status()
+        response = _request_with_retry(URL)
         requirements = response.json().get("data", [])
 
         # merge minor information with requirements
@@ -129,7 +138,7 @@ def fetch_minors():
         minor_copy["requirements"] = requirements
 
         all_minor_data.append(minor_copy)
-        time.sleep(SLEEP_TIME)  # sleep 100ms between requests --> avoid client error
+        time.sleep(SLEEP_TIME)
     
     # write to json file
     with open("all_minor_data.json", "w") as f:
@@ -138,8 +147,7 @@ def fetch_minors():
     print(f"\nSaved {len(all_minor_data)} minors.")
 
 def fetch_specializations():
-    response = requests.get(SPECIALIZATION_URL)
-    response.raise_for_status()
+    response = _request_with_retry(SPECIALIZATION_URL)
     specializations = response.json().get("data", [])
 
     # check if data exists
@@ -158,8 +166,7 @@ def fetch_specializations():
         
         spec_id = specialization["id"]
         URL = f"https://anteaterapi.com/v2/rest/programs/specialization?programId={spec_id}"
-        response = requests.get(URL)
-        response.raise_for_status()
+        response = _request_with_retry(URL)
         requirements = response.json().get("data", [])
 
         # merge major information with requirements
@@ -167,7 +174,7 @@ def fetch_specializations():
         spec_copy["requirements"] = requirements
 
         all_specialization_data.append(spec_copy)
-        time.sleep(SLEEP_TIME)  # sleep 100ms between requests --> avoid client error
+        time.sleep(SLEEP_TIME)
     
     # write to json file
     with open("all_specialization_data.json", "w") as f:
@@ -175,9 +182,22 @@ def fetch_specializations():
 
     print(f"\nSaved {len(all_specialization_data)} specializations.")
 
+def fetch_grades(departments=None):
+    """Fetch aggregated grade data. Tries single request first, falls back to per-department."""
+    print("Retrieving Grades...")
+
+    # Fetch all grades in one request
+    response = _request_with_retry(GRADES_URL)
+    all_grades = response.json().get("data", [])
+
+    with open("all_grade_data.json", "w") as f:
+        json.dump(all_grades, f, indent=2)
+
+    print(f"Saved {len(all_grades)} grade records.")
+    return all_grades
+
 def fetch_terms():
-    response = requests.get(TERM_URL)
-    response.raise_for_status()
+    response = _request_with_retry(TERM_URL)
     term_list = response.json().get("data", [])
 
     terms = []
@@ -196,8 +216,7 @@ def fetch_terms():
 def fetch_term_info(year, quarter):
     # query websoc
     URL = f"https://anteaterapi.com/v2/rest/websoc?year={year}&quarter={quarter}"
-    response = requests.get(URL)
-    response.raise_for_status()
+    response = _request_with_retry(URL)
     data = response.json().get("data", [])
 
     extracted = []
@@ -220,8 +239,12 @@ def fetch_term_info(year, quarter):
                             meeting_location = meeting_location[0].split()
                             building = meeting_location[0]
                             room = meeting_location[1]
+                        # extract instructor names
+                        instructors = section.get("instructors", [])
+                        instructor_str = ", ".join(instructors) if instructors else "TBA"
+
                         extracted.append({
-                            "department": dept_code, 
+                            "department": dept_code,
                             "courseNumber": course.get("courseNumber"),
                             "sectionCode": section.get("sectionCode"),
                             "sectionType": section.get("sectionType"),
@@ -236,7 +259,8 @@ def fetch_term_info(year, quarter):
                             "numCurrentlyEnrolled":  section.get("numCurrentlyEnrolled"),
                             "numWaitlistCap": section.get("numWaitlistCap"),
                             "numOnWaitlist": section.get("numOnWaitlist"),
-                            "isCancelled": section.get("isCancelled")
+                            "isCancelled": section.get("isCancelled"),
+                            "instructor": instructor_str
                         })
 
     return extracted

@@ -43,7 +43,7 @@ def compute_match_score(
     course_final_day = course.get("final_day", "") if course else ""
     course_format = (course.get("format", "in-person") if course else "in-person").lower()
     course_units = course.get("units", 4) if course else 4
-    course_difficulty = (course.get("difficulty") or "medium").lower()
+    course_gpa = course.get("averageGPA") if course else None
     course_restrictions = (course.get("restrictions") or "").split(" and ")
     course_level = course.get("level")
     sections = course.get("sections", []) if course else []
@@ -54,8 +54,17 @@ def compute_match_score(
 
     # keywords
     if "easy" in keywords:
-        score += 20
-        reasons.append("Easy course")
+        if course_gpa is not None and course_gpa >= 3.4:
+            score += 20
+            reasons.append(f"Easy course — GPA {course_gpa:.2f}")
+        elif course_gpa is not None and course_gpa >= 3.0:
+            score += 10
+            reasons.append(f"Medium difficulty — GPA {course_gpa:.2f}")
+        elif course_gpa is not None:
+            score += 0
+            reasons.append(f"Hard course — GPA {course_gpa:.2f}")
+        else:
+            score += 5
     if "online" in keywords:
         score += 15
         reasons.append("Online format")
@@ -159,17 +168,18 @@ def compute_match_score(
         score += 5
         reasons.append("Higher-unit course")
 
-    # grading / difficulty preference
-    if workload == "light":
-        if course_difficulty == "high":
-            score -= 15
-            reasons.append("Heavy grading workload")
-        elif course_difficulty == "low":
-            score += 10
-            reasons.append("Light grading workload")
-    elif workload == "heavy":
-        if course_difficulty == "high":
-            score += 5
+    # grading / difficulty preference based on actual GPA data
+    if course_gpa is not None:
+        if workload == "light":
+            if course_gpa < 3.0:
+                score -= 15
+                reasons.append(f"Hard course — GPA {course_gpa:.2f}")
+            elif course_gpa >= 3.4:
+                score += 10
+                reasons.append(f"Easy course — GPA {course_gpa:.2f}")
+        elif workload == "heavy":
+            if course_gpa < 3.0:
+                score += 5
 
     # section availability bonus
     # print(sections)

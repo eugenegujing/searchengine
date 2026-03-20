@@ -302,9 +302,9 @@ def api_search():
             placeholders = ",".join("?" * len(course_ids))
             parts = quarter.split("-")
             term_rows = conn.execute(f"""
-                SELECT course_id, section_code, start_time, end_time, days, building_id, 
+                SELECT course_id, section_code, start_time, end_time, days, building_id,
                        room_number, restrictions, max_capacity, num_currently_enrolled,
-                       waitlist_capacity, num_on_waitlist
+                       waitlist_capacity, num_on_waitlist, instructor
                 FROM Terms
                 WHERE course_id IN ({placeholders}) AND year = ? AND LOWER(quarter) = LOWER(?)
             """, course_ids + [int(parts[0]), parts[1]]).fetchall()
@@ -326,6 +326,16 @@ def api_search():
         if ge_val not in course_ge[cid]:
             course_ge[cid].append(ge_val)
 
+    # Load course GPA data
+    course_gpa = {}
+    try:
+        gpa_rows = conn.execute("SELECT course_id, average_gpa FROM CourseGrades").fetchall()
+        for r in gpa_rows:
+            if r["average_gpa"] is not None:
+                course_gpa[r["course_id"]] = round(r["average_gpa"], 2)
+    except Exception:
+        pass
+
     courses = []
     for row in rows:
         cid = row["course_id"]
@@ -346,6 +356,7 @@ def api_search():
         time_str = ""
         days_str = ""
         location = "TBA"
+        instructor = ""
 
         for course in term_courses:
             if course["section_code"] % 10 == 0:
@@ -358,6 +369,7 @@ def api_search():
                 if term["room_number"]:
                     location_parts.append(str(term["room_number"]))
                 location = " ".join(location_parts) or "TBA"
+                instructor = term["instructor"] or "TBA"
         
 
                 ge_list = course_ge.get(cid, [])
@@ -380,6 +392,8 @@ def api_search():
                 waitlist_capacity = course["waitlist_capacity"]
                 num_on_waitlist = course["num_on_waitlist"]
 
+                avg_gpa = course_gpa.get(cid)
+
                 course_dict = {
                     "id": cid,
                     "ge": ge_list,
@@ -391,7 +405,8 @@ def api_search():
                     "maxCapacity": max_capacity,
                     "numCurrentlyEnrolled": num_currently_enrolled,
                     "waitlistCapacity": waitlist_capacity,
-                    "numOnWaitlist": num_on_waitlist
+                    "numOnWaitlist": num_on_waitlist,
+                    "averageGPA": avg_gpa
                 }
 
                 score = 0
@@ -424,7 +439,7 @@ def api_search():
                     "dept": row["department"],
                     "level": level_str,
                     "units": course_units,
-                    "instructor": "",
+                    "instructor": instructor,
                     "time": course_time_str,
                     "location": location,
                     "format": "in-person",
@@ -432,6 +447,7 @@ def api_search():
                     "tags": tags,
                     "matchScore": score,
                     "explanation": ". ".join(reasons) if reasons else "",
+                    "averageGPA": avg_gpa,
                 })
 
     if sort_by == "units-asc":

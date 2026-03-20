@@ -28,11 +28,18 @@ def setup_index(n_terms):
     minors_file.close()
     specializations_file.close()
 
+    all_grade_data = []
+    grade_path = Path("all_grade_data.json")
+    if grade_path.exists():
+        with open(grade_path, "r") as f:
+            all_grade_data = json.load(f)
+
     db_path = Path(DB_PATH)
     db_path.unlink(missing_ok=True)
 
-    conn = sql_index.create_index(DB_PATH, all_course_data, all_major_data, 
-                                  all_minor_data, all_spec_data, n_terms)
+    conn = sql_index.create_index(DB_PATH, all_course_data, all_major_data,
+                                  all_minor_data, all_spec_data,
+                                  all_grade_data, n_terms)
     conn.close()
     create_user_index()
     
@@ -43,7 +50,8 @@ def retrieve_api_course_data(force=False):
         Path("all_course_data.json"),
         Path("all_major_data.json"),
         Path("all_minor_data.json"),
-        Path("all_specialization_data.json")
+        Path("all_specialization_data.json"),
+        Path("all_grade_data.json")
     ]
 
     if not force and all(f.exists() for f in data_jsons):
@@ -51,11 +59,17 @@ def retrieve_api_course_data(force=False):
         return
 
     for file in data_jsons:
-        file.unlink(missing_ok=True)
+        try:
+            file.unlink(missing_ok=True)
+        except PermissionError:
+            pass  # file in use — will be overwritten
     data_collection.fetch_courses()
     data_collection.fetch_majors()
     data_collection.fetch_minors()
     data_collection.fetch_specializations()
+
+    # fetch grade data
+    data_collection.fetch_grades()
 
 
 if __name__ == "__main__":

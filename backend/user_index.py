@@ -47,7 +47,24 @@ def create_user_index():
     )
     """)
 
+    # CourseGrades table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS CourseGrades (
+        course_id TEXT PRIMARY KEY,
+        average_gpa REAL,
+        grade_a_count INTEGER,
+        grade_b_count INTEGER,
+        grade_c_count INTEGER,
+        grade_d_count INTEGER,
+        grade_f_count INTEGER,
+        FOREIGN KEY (course_id) REFERENCES Courses(course_id)
+    )
+    """)
+
+    # Add instructor column to Terms if missing
+    existing_cols = [row[1] for row in cursor.execute("PRAGMA table_info(Terms)").fetchall()]
+    if "instructor" not in existing_cols:
+        cursor.execute("ALTER TABLE Terms ADD COLUMN instructor TEXT")
+
     conn.commit()
     conn.close()
-
-    # print("User tables created successfully")
