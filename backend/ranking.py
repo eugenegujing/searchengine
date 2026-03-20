@@ -66,27 +66,43 @@ def compute_match_score(
             reasons.append(f"Hard course — GPA {course_gpa:.2f}")
         else:
             score += 5
+
+
     if "online" in keywords:
         score += 15
         reasons.append("Online format")
+    # if course format does not appear in keywords, use preferred format
+    elif preferred_format == course_format:
+        score += 10
+        reasons.append(f"Matches preferred format: {course_format}")
+
+
+    elif preferred_format == "any":
+        score += 2
     if "morning" in keywords:
         if course and _check_time_preference("morning", course.get("time", "")):
             score += 10
             reasons.append("Morning class")
         else:
-            score -= 15
-    if "afternoon" in keywords:
+            score -= 25
+    elif "afternoon" in keywords:
         if course and _check_time_preference("afternoon", course.get("time", "")):
             score += 10
             reasons.append("Afternoon class")
         else:
-            score -= 15
-    if "evening" in keywords:
+            score -= 25
+    elif "evening" in keywords:
         if course and _check_time_preference("evening", course.get("time", "")):
             score += 10
             reasons.append("Evening class")
         else:
-            score -= 15
+            score -= 25
+    # if time does not appear in keywords, check preferred time
+    elif preferred_time != "any" and _check_time_preference(preferred_time, course_time):
+        score += 10
+        reasons.append(f"Matches {preferred_time} preference")
+    elif preferred_time != "any":
+        score -= 15
 
     # penalty for completed courses
     if course_id in completed:
@@ -147,10 +163,7 @@ def compute_match_score(
             score += 20
             reasons.append(f"Satisfies GE need: {', '.join(matching_ge)}")
 
-    # preferred time
-    if preferred_time != "any" and _check_time_preference(preferred_time, course_time):
-        score += 15
-        reasons.append(f"Matches {preferred_time} preference")
+    
 
     # units
     max_units = user_profile.get("max_units", 4)
@@ -160,13 +173,6 @@ def compute_match_score(
     if course_units <= max_units:
         score += 10
         reasons.append(f"Units <= {max_units}")
-
-    # course format preference
-    if preferred_format == course_format:
-        score += 10
-        reasons.append(f"Matches preferred format: {course_format}")
-    elif preferred_format == "any":
-        score += 2
 
     # workload preference
     if workload == "light" and course_units <= 3:
@@ -208,7 +214,7 @@ def compute_match_score(
         low_wait_sections += 1
     else:
         score -= 30
-        reasons.append("No space in class")
+        reasons.append("No space in section")
 
     if open_sections > 0:
         score += min(open_sections, 3) * 2
