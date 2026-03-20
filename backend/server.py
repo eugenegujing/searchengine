@@ -70,6 +70,7 @@ SYNONYMS = {
     "phys": "physics",
     "eng": "engineering",
     "math": "math",
+    "maths": "math",
     "poli": "political",
     "anthro": "anthropology",
     "soc": "social",
@@ -151,12 +152,7 @@ def api_search():
                 for course_id in completed:
                     course_search.add_prerequisite(course_id)
                 course_search.init_major_requirement_contribution()
-                major_course_ids = course_search.search(include_prereq_unsatisfied=False,include_completed=False)
-                # rows = conn.execute("""
-                #     SELECT course_id FROM MajorCourses
-                #     WHERE major_id = ? AND course_id IS NOT NULL
-                # """, (major_id,)).fetchall()
-                # major_course_ids = {r["course_id"] for r in rows}
+                major_course_ids = course_search.search(include_prereq_unsatisfied=True,include_completed=False)
 
     clauses = []
     params  = []
@@ -171,7 +167,7 @@ def api_search():
             clauses.append("LOWER(T.quarter) = LOWER(?)")
             params.append(parts[1])
             if course_search:
-                major_course_ids = course_search.search(parts[0], parts[1],include_prereq_unsatisfied=False,include_completed=False)
+                major_course_ids = course_search.search(parts[0], parts[1],include_prereq_unsatisfied=True,include_completed=False)
 
     if dept:
         clauses.append("C.department = ?")
@@ -245,6 +241,15 @@ def api_search():
     elif pill == "morning":
         need_terms = True
         clauses.append("T.start_time < '12:00'")
+        clauses.append("T.start_time != 'TBA'")
+    elif pill == "afternoon":
+        need_terms = True
+        clauses.append("T.start_time >= '12:00'")
+        clauses.append("T.start_time < '17:00'")
+        clauses.append("T.start_time != 'TBA'")
+    elif pill == "evening":
+        need_terms = True
+        clauses.append("T.start_time >= '17:00'")
         clauses.append("T.start_time != 'TBA'")
     elif pill == "ge" and ge_needed:
         # Convert short codes (e.g. "VI") to full DB names (e.g. "GE VI: Language Other Than English")
@@ -521,7 +526,8 @@ def api_major_courses(major_id):
         from collections import Counter
         group_counts = Counter(r["group_label"] for r in rows)
 
-        core = []
+        core_lower = []
+        core_upper = []
         electives = []
         ge = []
         seen = set()
@@ -542,9 +548,18 @@ def api_major_courses(major_id):
             elif group_counts[r["group_label"]] > 10:
                 electives.append(entry)
             else:
-                core.append(entry)
+                # Split core into lower/upper division
+                num_str = r["course_number"] or ""
+                try:
+                    num = int("".join(c for c in num_str if c.isdigit()) or "0")
+                except ValueError:
+                    num = 0
+                if num < 100:
+                    core_lower.append(entry)
+                else:
+                    core_upper.append(entry)
 
-        return jsonify({"core": core, "electives": electives, "ge": ge})
+        return jsonify({"core_lower": core_lower, "core_upper": core_upper, "electives": electives, "ge": ge})
     except Exception:
         conn.close()
         return jsonify({"core": [], "electives": [], "ge": []})

@@ -48,7 +48,8 @@ function loadMajorCourses(majorId, savedCompleted) {
     .then(res => res.json())
     .then(data => {
       const sections = [
-        { key: 'core', label: 'Core Requirements', open: true },
+        { key: 'core_lower', label: 'Core Requirements — Lower Division', open: true },
+        { key: 'core_upper', label: 'Core Requirements — Upper Division', open: false },
         { key: 'electives', label: 'Electives', open: false },
         { key: 'ge', label: 'GE Requirements', open: false },
       ];
