@@ -51,6 +51,7 @@ def compute_match_score(
     enrolled = course.get("numCurrentlyEnrolled")
     cap = course.get("maxCapacity")
     wait = course.get("numOnWaitlist")
+    wait_cap = course.get("waitlistCapacity")
 
     # keywords
     if "easy" in keywords:
@@ -203,16 +204,19 @@ def compute_match_score(
 
     if cap is not None and enrolled is not None and enrolled < cap:
         open_sections += 1
-    if wait is not None and wait == 0:
+    elif wait is not None and wait < wait_cap:
         low_wait_sections += 1
+    else:
+        score -= 30
+        reasons.append("No space in class")
 
     if open_sections > 0:
         score += min(open_sections, 3) * 2
         reasons.append(f"{open_sections} section(s) with open seats")
 
-    if low_wait_sections > 0:
-        score += min(low_wait_sections, 2)
-        reasons.append("Low or no waitlist enrollment")
+    elif low_wait_sections > 0:
+        # score += min(low_wait_sections, 2)
+        reasons.append("Space on waitlist")
 
     # contextual schedule penalties
     if _has_time_conflict(course_time, course_days, current_schedule):
