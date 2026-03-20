@@ -145,6 +145,8 @@ function applyFilters() {
   const level    = document.getElementById('filterLevel')?.value || '';
   const ge       = document.getElementById('filterGE')?.value || '';
   const maxUnits = document.getElementById('filterUnits')?.value || '';
+  const timePref = document.getElementById('filterTime')?.value || '';
+  const format   = document.getElementById('filterFormat')?.value || '';
   const sortBy   = sortBySelect?.value || 'relevance';
 
   const params = new URLSearchParams();
@@ -154,6 +156,8 @@ function applyFilters() {
   if (level)    params.set('level', level);
   if (ge)       params.set('ge', ge);
   if (maxUnits && parseInt(maxUnits) < 8) params.set('maxUnits', maxUnits);
+  if (timePref) params.set('timeOfDay', timePref);
+  if (format)   params.set('format', format);
   params.set('sortBy', sortBy);
   if (username) params.set('username', username);
   if (activePill) params.set('pill', activePill);

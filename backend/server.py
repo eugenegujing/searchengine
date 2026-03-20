@@ -247,6 +247,7 @@ def api_search():
     
     if time_pref:
         need_terms = True  # make sure we join Terms table
+        clauses.append("T.start_time IS NOT NULL AND T.start_time != 'TBA'")
         if time_pref.lower() == "morning":
             clauses.append("T.start_time < '12:00'")
         elif time_pref.lower() == "afternoon":
