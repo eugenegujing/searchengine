@@ -103,12 +103,13 @@ def compute_match_score(
         return 0, reasons
 
     # prerequisite completion
-    if check_prerequisites(course_id, completed, db_path):
+    prereqs_met = check_prerequisites(course_id, completed, db_path)
+    if prereqs_met:
         score += 15
         reasons.append("Prerequisites completed")
     else:
+        score -= 30
         reasons.append("Prerequisites not satisfied")
-        return 0, reasons
 
 
     if major_id:
