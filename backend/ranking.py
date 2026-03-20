@@ -52,7 +52,6 @@ def compute_match_score(
     cap = course.get("maxCapacity")
     wait = course.get("numOnWaitlist")
 
-    print(keywords)
     # keywords
     if "easy" in keywords:
         if course_gpa is not None and course_gpa >= 3.4:
@@ -190,29 +189,29 @@ def compute_match_score(
 
     # section availability bonus
     # print(sections)
-    if sections:
-        score += min(len(sections), 5)
-        reasons.append(f"{len(sections)} section option(s)")
+    # if sections:
+    #     score += min(len(sections), 5)
+    #     reasons.append(f"{len(sections)} section option(s)")
 
-        open_sections = 0
-        low_wait_sections = 0
+    open_sections = 0
+    low_wait_sections = 0
         # for sec in sections:
             # enrolled = _safe_int(sec.get("numCurrentlyEnrolled"), default=None)
             # cap = _safe_int(sec.get("maxCapacity"), default=None)
             # wait = _safe_int(sec.get("numOnWaitlist"), default=None)
 
-        if cap is not None and enrolled is not None and enrolled < cap:
-            open_sections += 1
-        if wait is not None and wait == 0:
-            low_wait_sections += 1
+    if cap is not None and enrolled is not None and enrolled < cap:
+        open_sections += 1
+    if wait is not None and wait == 0:
+        low_wait_sections += 1
 
-        if open_sections > 0:
-            score += min(open_sections, 3) * 2
-            reasons.append(f"{open_sections} section(s) with open seats")
+    if open_sections > 0:
+        score += min(open_sections, 3) * 2
+        reasons.append(f"{open_sections} section(s) with open seats")
 
-        if low_wait_sections > 0:
-            score += min(low_wait_sections, 2)
-            reasons.append("Low or no waitlist enrollment")
+    if low_wait_sections > 0:
+        score += min(low_wait_sections, 2)
+        reasons.append("Low or no waitlist enrollment")
 
     # contextual schedule penalties
     if _has_time_conflict(course_time, course_days, current_schedule):
