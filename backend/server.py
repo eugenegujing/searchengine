@@ -450,6 +450,14 @@ def api_search():
                     "averageGPA": avg_gpa,
                 })
 
+    # Deduplicate: keep highest-scored card per course
+    seen = {}
+    for c in courses:
+        cid = c["id"]
+        if cid not in seen or c["matchScore"] > seen[cid]["matchScore"]:
+            seen[cid] = c
+    courses = list(seen.values())
+
     if sort_by == "units-asc":
         courses.sort(key=lambda c: c["units"])
     elif sort_by == "units-desc":
