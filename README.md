@@ -11,12 +11,15 @@ Instead of relying on live API calls, this system uses a locally collected WebSO
 - Sections
 - Meeting times
 - Locations
+- Grade distributions / average GPAs
+- Instructor names
 
 The goal of this demo is to show:
 - Database indexing
 - Term filtering
-- Course ranking
+- Course ranking with GPA-based difficulty assessment
 - Real meeting data integration
+- Personalized recommendations based on user profile
 
 ## Setup
 
@@ -64,22 +67,26 @@ searchengine/
 │   ├── index_setup.py               # Main setup script: downloads data (if needed) and builds courses.db
 │   ├── quick_setup.py               # Lightweight setup: builds a minimal DB (no WebSOC term details)
 │   ├── server.py                    # Flask web server — serves frontend and provides REST API endpoints
+│   ├── ranking.py                   # Course ranking logic — multi-factor scoring with explainability
+│   ├── user_index.py                # Creates user-related tables (Users, UserCompletedCourses, CourseGrades)
 │   ├── progress_report_1_demo.py    # Demo script used for progress report #1 presentation
 │   │
 │   ├── all_course_data.json         # [Generated] All course data from Anteater API
 │   ├── all_major_data.json          # [Generated] All majors and their graduation requirements
 │   ├── all_minor_data.json          # [Generated] All minors and their requirements
 │   ├── all_specialization_data.json # [Generated] All specializations and their requirements
+│   ├── all_grade_data.json          # [Generated] Aggregated grade distributions from Anteater API
 │   └── courses.db                   # [Generated] SQLite database built from the JSON files above
 │
 ├── frontend/
+│   ├── LoginPage.html               # Login / registration page
 │   ├── UserProfilePage.html         # Onboarding page: 4-step form for student profile
-│   ├── SearchPage.html              # Main search page: filters, search bar, course result cards
+│   ├── SearchPage.html              # Main search page: filters, quick-filter pills, course result cards
 │   └── static/
-│       ├── css/style.css            # All styling for both pages
+│       ├── css/style.css            # All styling for both pages (incl. GPA tag color coding)
 │       └── js/
-│           ├── UserProfilePage.js   # Onboarding form logic, saves profile to localStorage
-│           └── SearchPage.js        # Search page logic: calls API, renders course cards
+│           ├── UserProfilePage.js   # Onboarding form logic, major courses split by lower/upper div
+│           └── SearchPage.js        # Search page logic: calls API, renders course cards with GPA & instructor
 │
 ├── requirements.txt                 # Python dependencies (flask, flask-cors, requests)
 └── README.md                        # This file
@@ -127,6 +134,42 @@ Stores term-specific section and meeting information from WebSOC.
 | `waitlist_capacity` | Waitlist capacity |
 | `num_on_waitlist` | Current waitlist count |
 | `is_cancelled` | Cancellation flag |
+| `instructor` | Instructor name(s) |
+
+#### `CourseGrades`
+Stores aggregated grade distribution data per course.
+
+| Column | Description |
+|--------|-------------|
+| `course_id` | References `Courses.course_id` |
+| `average_gpa` | Average GPA across all recorded sections |
+| `grade_a_count` | Number of A grades |
+| `grade_b_count` | Number of B grades |
+| `grade_c_count` | Number of C grades |
+| `grade_d_count` | Number of D grades |
+| `grade_f_count` | Number of F grades |
+
+#### `Users`
+Stores user account and preference data.
+
+| Column | Description |
+|--------|-------------|
+| `username` | Login username |
+| `password` | User password |
+| `display_name` | Display name |
+| `standing` | Academic standing (Freshman / Sophomore / etc.) |
+| `major` | Selected major ID |
+| `preferred_time` | Time of day preference |
+| `workload` | Workload preference (light / balanced / heavy) |
+| `course_format` | Format preference (in-person / online) |
+| `quarter_target` | Target enrollment quarter |
+| `max_units` | Max units per course |
+
+#### `UserCompletedCourses`
+Tracks which courses each user has completed.
+
+#### `UserGeNeeds`
+Tracks which GE categories each user still needs.
 
 ### Requirement tables
 
@@ -245,8 +288,8 @@ Courses are scored using a combination of academic relevance, user preferences, 
 - **Major requirement** (+30)  
   Courses required for the selected major are prioritized.
 
-- **Prerequisite completion** (+15 / disqualify if unmet)  
-  Courses with unmet prerequisites are heavily penalized.
+- **Prerequisite completion** (+15 if met / −30 if unmet)
+  Courses with unmet prerequisites are penalized but still shown (so users can see upcoming major courses).
 
 - **Dependency bonus** (+ up to 15)  
   Courses that unlock future required courses are boosted.
@@ -279,19 +322,31 @@ Courses are scored using a combination of academic relevance, user preferences, 
 
 #### 🔍 Keyword Boosts
 
-Optional keyword-based boosts:
+Optional keyword-based boosts using real GPA data:
 
-- `"morning"`, `"afternoon"`, `"evening"` → +10
+- `"morning"`, `"afternoon"`, `"evening"` → +10 (if course matches the time slot)
 - `"online"` → +15 (only if actually online)
-- `"easy"` → small boost (+5)
+- `"easy"` → GPA-based scoring:
+  - GPA ≥ 3.4: +10 (Easy course)
+  - GPA 3.0–3.4: +0 (Medium difficulty)
+  - GPA < 3.0: +0 (Hard course)
+  - No GPA data: +5
 
 ---
 
+#### 📊 GPA-Based Difficulty Signals
+
+When the user's workload preference is set:
+
+- **Light workload + hard course** (GPA < 3.0): −15
+- **Light workload + easy course** (GPA ≥ 3.4): +10
+- **Heavy workload + hard course** (GPA < 3.0): +5
+
 #### 🏫 Section & Availability Signals
 
-- **More sections available** (+ up to 5)
 - **Open seats available** (+ up to 6)
-- **Low or no waitlist** (+ up to 2)
+- **Space on waitlist** (noted in explanation)
+- **No space in class** (−30)
 
 These signals prioritize courses that are easier to enroll in.
 
@@ -336,8 +391,8 @@ The ranking system adapts dynamically based on the student's current schedule.
 - **Personalization**  
   Results change based on user profile and schedule.
 
-- **Feasibility-first**  
-  Courses that cannot be taken (prereqs not met) are filtered out.
+- **Feasibility-aware**
+  Courses with unmet prerequisites are penalized but still visible, so users can plan ahead.
 
 - **Real-world constraints**  
   Uses actual meeting times, enrollment data, and schedule conflicts.
@@ -354,3 +409,49 @@ The ranking system is not static — it dynamically adapts based on:
 - enrollment feasibility (sections, waitlist)
 
 This produces a more realistic and useful course recommendation experience compared to simple filtering or keyword search.
+
+---
+
+## Additional Features
+
+### Grade / GPA Integration
+
+- Aggregated grade data is fetched from Anteater API (`/v2/rest/grades/aggregateByCourse`) and stored in the `CourseGrades` table.
+- Each course card displays an **Avg GPA** tag, color-coded:
+  - Green (≥ 3.4): Easy course
+  - Yellow (3.0–3.4): Medium difficulty
+  - Red (< 3.0): Hard course
+- GPA data is used as a ranking signal for the `"easy"` keyword and workload preferences.
+
+### Instructor Display
+
+- Instructor names are extracted from WebSOC section data and stored in the `Terms` table.
+- Displayed on each course card alongside time and location.
+
+### Course Deduplication
+
+- Courses with multiple lecture sections are deduplicated in search results, keeping only the highest-scoring section per course.
+
+### GE Search Excludes Major Core Courses
+
+- When searching for GE courses (via keyword, dropdown filter, or "GE I Need" pill), major core requirement courses are excluded from results so users only see courses that fulfill GE needs without overlapping with their required major coursework.
+
+### Major Courses Split by Division
+
+- On the profile page, core requirements are split into **Lower Division** and **Upper Division** categories, making it easier to find and mark intro-level courses as completed.
+
+### Quick-Filter Pills
+
+- Two quick-filter pills on the search page: **My Major** (shows only major-required courses) and **GE I Need** (shows only courses satisfying the user's remaining GE categories).
+
+### Sidebar Filter Connectivity
+
+- Time of Day and Format sidebar filters are connected to the backend API, enabling hard filtering (e.g., selecting "Morning" only returns courses before 12:00 PM).
+
+### Synonym Support
+
+- Common abbreviations are mapped to canonical terms for search (e.g., `cs` → `compsci`, `maths` → `math`, `stats` → `statistics`).
+
+### Rate Limit Resilience
+
+- All Anteater API calls use a universal `_request_with_retry()` helper that automatically retries on HTTP 429 rate-limit responses with progressive backoff.
