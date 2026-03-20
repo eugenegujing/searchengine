@@ -52,16 +52,17 @@ def compute_match_score(
     cap = course.get("maxCapacity")
     wait = course.get("numOnWaitlist")
 
+    print(keywords)
     # keywords
     if "easy" in keywords:
         if course_gpa is not None and course_gpa >= 3.4:
-            score += 20
+            score += 10
             reasons.append(f"Easy course — GPA {course_gpa:.2f}")
         elif course_gpa is not None and course_gpa >= 3.0:
-            score += 10
+            score += 0
             reasons.append(f"Medium difficulty — GPA {course_gpa:.2f}")
         elif course_gpa is not None:
-            score += 0
+            score -= 10
             reasons.append(f"Hard course — GPA {course_gpa:.2f}")
         else:
             score += 5
@@ -72,14 +73,20 @@ def compute_match_score(
         if course and _check_time_preference("morning", course.get("time", "")):
             score += 10
             reasons.append("Morning class")
+        else:
+            score -= 15
     if "afternoon" in keywords:
         if course and _check_time_preference("afternoon", course.get("time", "")):
             score += 10
             reasons.append("Afternoon class")
+        else:
+            score -= 15
     if "evening" in keywords:
         if course and _check_time_preference("evening", course.get("time", "")):
             score += 10
             reasons.append("Evening class")
+        else:
+            score -= 15
 
     # penalty for completed courses
     if course_id in completed:
