@@ -109,6 +109,7 @@ def api_search():
     completed = set()
     ge_needed = set()
     major_course_ids = set()
+    major_core_ids = set()
     prereq_map = {}
     course_search = None
 
@@ -154,6 +155,19 @@ def api_search():
                 course_search.init_major_requirement_contribution()
                 major_course_ids = course_search.search(include_prereq_unsatisfied=True,include_completed=False)
 
+                # Build set of core major courses (non-elective) for GE exclusion
+                core_rows = conn.execute("""
+                    SELECT MC.course_id, MC.group_label
+                    FROM MajorCourses MC
+                    WHERE MC.major_id = ? AND MC.course_id IS NOT NULL
+                """, (major_id,)).fetchall()
+                group_counts = Counter(r["group_label"] for r in core_rows)
+                major_core_ids = set()
+                for r in core_rows:
+                    gl = (r["group_label"] or "").lower()
+                    if "ge " not in gl and "ge-" not in gl and not gl.startswith("ge") and group_counts[r["group_label"]] <= 10:
+                        major_core_ids.add(r["course_id"])
+
     clauses = []
     params  = []
     need_terms = False
@@ -184,6 +198,10 @@ def api_search():
             clauses.append("""C.course_id IN (
                 SELECT course_id FROM GenEdRequirements WHERE ge_category = ?
             )""")
+            if major_core_ids:
+                ph = ",".join("?" * len(major_core_ids))
+                clauses.append(f"C.course_id NOT IN ({ph})")
+                params.extend(major_core_ids)
             params.append(ge_category)
 
     if max_units and max_units.isdigit() and int(max_units) < 8:
@@ -201,10 +219,14 @@ def api_search():
             if word in RANKING_KEYWORDS:
                 search_keywords.append(word)
             elif word in FILTER_KEYWORDS:
-                # "ge" → filter to courses with GE requirements
+                # "ge" → filter to courses with GE requirements, exclude major core courses
                 clauses.append("""C.course_id IN (
                     SELECT DISTINCT course_id FROM GenEdRequirements
                 )""")
+                if major_core_ids:
+                    ph = ",".join("?" * len(major_core_ids))
+                    clauses.append(f"C.course_id NOT IN ({ph})")
+                    params.extend(major_core_ids)
             elif word in LEVEL_KEYWORDS:
                 # "upper" / "lower" → course level filter
                 if word == "upper":
@@ -266,6 +288,10 @@ def api_search():
                 SELECT course_id FROM GenEdRequirements WHERE ge_category IN ({placeholders_ge})
             )""")
             params.extend(ge_full_names)
+            if major_core_ids:
+                ph = ",".join("?" * len(major_core_ids))
+                clauses.append(f"C.course_id NOT IN ({ph})")
+                params.extend(major_core_ids)
     elif pill == "major" and major_course_ids:
         placeholders_mc = ",".join("?" * len(major_course_ids))
         clauses.append(f"C.course_id IN ({placeholders_mc})")
